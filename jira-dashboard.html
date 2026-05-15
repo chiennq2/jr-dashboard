@@ -445,10 +445,14 @@
     function openDailyLogworkModal() {
       var modal = document.getElementById('dailyLogworkModal');
       modal.classList.remove('hidden');
-      if (!dailyLogworkDate) {
-        var now = new Date();
-        dailyLogworkDate = toJiraDate(now);
-      }
+      var now = new Date();
+      dailyLogworkDate = toJiraDate(now);
+      var picker = document.getElementById('dailyLogworkDate')._flatpickr;
+      if (picker) picker.setDate(now, false);
+      dailySelectedUsers = [];
+      renderDailyUserTags();
+      var dailyUserInput = document.getElementById('dailyUserInput');
+      if (dailyUserInput) dailyUserInput.value = '';
       loadDailyLogworkData();
     }
 
@@ -664,28 +668,36 @@
         dailyLogworkDate = dateStr;
         var jql = 'worklogDate = "' + dateStr + '"';
         var issues = await fetchAllIssues(jql);
-        var assigneeMap = {};
-        issues.forEach(function(i) {
-          var tt = i.fields.timetracking || {};
-          var aobj = i.fields.assignee || {};
-          var aname = aobj.displayName || aobj.name || 'Unassigned';
-          var aid = aobj.accountId || aobj.key || aobj.name || aname;
-          if (!assigneeMap[aid]) assigneeMap[aid] = { id: aid, name: aname, seconds: 0 };
-          assigneeMap[aid].seconds += tt.timeSpentSeconds || 0;
-        });
+        var logsByUser = {};
+        for (var i = 0; i < issues.length; i++) {
+          var issueKey = issues[i] && issues[i].key;
+          if (!issueKey) continue;
+          var worklogs = [];
+          try {
+            worklogs = await fetchIssueWorklogs(issueKey);
+          } catch (e) {
+            worklogs = [];
+          }
+          worklogs.forEach(function(wl) {
+            var started = String((wl || {}).started || '');
+            if (!started || started.slice(0, 10) !== dateStr) return;
+            var author = (wl || {}).author || {};
+            var uid = author.accountId || author.key || author.name || author.emailAddress || author.displayName || 'unknown';
+            var uname = author.displayName || author.name || author.emailAddress || uid;
+            if (!logsByUser[uid]) logsByUser[uid] = { id: uid, name: uname, seconds: 0 };
+            logsByUser[uid].seconds += wl.timeSpentSeconds || 0;
+          });
+        }
 
-        var rows = Object.keys(assigneeMap).map(function(id) {
-          return { id: assigneeMap[id].id, name: assigneeMap[id].name, hours: +(assigneeMap[id].seconds / 3600).toFixed(1) };
-        }).filter(function(r) {
-          return r.hours > 0;
-        }).sort(function(a, b) {
-          return b.hours - a.hours;
-        });
+        var rows = Object.keys(logsByUser).map(function(id) {
+          return { id: logsByUser[id].id, name: logsByUser[id].name, hours: +(logsByUser[id].seconds / 3600).toFixed(1) };
+        }).filter(function(r) { return r.hours > 0; })
+          .sort(function(a, b) { return b.hours - a.hours; });
 
         if (dailySelectedUsers.length) {
           var selected = {};
           dailySelectedUsers.forEach(function(u) {
-            selected[u.accountId || u.key || u.username || u.name] = true;
+            selected[u.accountId || u.key || u.id || u.username || u.name] = true;
           });
           rows = rows.filter(function(r) { return !!selected[r.id]; });
         } else {
@@ -1554,7 +1566,7 @@
                   var estH = toHours(assigneeMap[key].est || 0);
                   var logH = toHours(assigneeMap[key].log || 0);
                   var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[key] || {}).length;
-                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | So ngay co logwork: ' + ngayCongAssignee;
+                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Σ logwork: ' + ngayCongAssignee;
                 }
               }
             }
