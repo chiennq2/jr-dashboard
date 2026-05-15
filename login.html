@@ -4,24 +4,524 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Đăng nhập Jira Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>*{font-family:'Inter',sans-serif;}</style>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #030712;
+      --bg-secondary: #071024;
+      --text-main: #e6f6ff;
+      --text-muted: #95adc4;
+      --line-soft: rgba(139, 203, 255, 0.24);
+      --line-strong: rgba(120, 216, 255, 0.6);
+      --glass-bg: rgba(5, 14, 29, 0.66);
+      --chip-bg: rgba(55, 178, 255, 0.16);
+      --accent-a: #19e3ff;
+      --accent-b: #3f9eff;
+      --focus: rgba(80, 224, 255, 0.8);
+      --shadow-main: 0 30px 90px rgba(1, 12, 28, 0.7);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--text-main);
+      background: radial-gradient(circle at 15% 20%, #10264b 0%, var(--bg-base) 45%), var(--bg-base);
+      font-family: 'Manrope', sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .bg-layer {
+      position: fixed;
+      inset: -12vmax;
+      pointer-events: none;
+      z-index: -5;
+    }
+
+    .network-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: -2;
+      opacity: 0.95;
+    }
+
+    .mesh {
+      background:
+        radial-gradient(circle at 14% 16%, rgba(64, 150, 255, 0.38), transparent 42%),
+        radial-gradient(circle at 82% 18%, rgba(43, 226, 255, 0.3), transparent 38%),
+        radial-gradient(circle at 74% 84%, rgba(36, 109, 255, 0.26), transparent 42%),
+        radial-gradient(circle at 36% 70%, rgba(26, 78, 204, 0.2), transparent 36%),
+        linear-gradient(140deg, #020611 0%, #07142a 50%, #030a16 100%);
+      filter: blur(4px) saturate(1.14);
+      animation: driftMesh 22s ease-in-out infinite alternate;
+    }
+
+    .grid {
+      z-index: -4;
+      opacity: 0.22;
+      background-image:
+        linear-gradient(rgba(142, 222, 255, 0.14) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(142, 222, 255, 0.12) 1px, transparent 1px);
+      background-size: 56px 56px;
+      transform: perspective(980px) rotateX(66deg) scale(1.15);
+      transform-origin: center 62%;
+      animation: gridPulse 8s ease-in-out infinite;
+    }
+
+    .beam {
+      z-index: -3;
+      overflow: hidden;
+      opacity: 0.65;
+    }
+
+    .beam::before {
+      content: '';
+      position: absolute;
+      inset: -60% -40%;
+      background:
+        linear-gradient(
+          118deg,
+          transparent 34%,
+          rgba(116, 214, 255, 0.08) 44%,
+          rgba(125, 226, 255, 0.2) 50%,
+          rgba(116, 214, 255, 0.08) 56%,
+          transparent 66%
+        );
+      transform: translate3d(-30%, -12%, 0) rotate(-8deg);
+      mix-blend-mode: screen;
+      animation: beamSweep 14s cubic-bezier(.25,.45,.2,1) infinite;
+    }
+
+    .scanline::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(140, 216, 255, 0.02),
+        rgba(140, 216, 255, 0.02) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+      mix-blend-mode: screen;
+      opacity: 0.5;
+    }
+
+    .scanline {
+      z-index: -1;
+    }
+
+    .noise::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.08;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.7) 0.55px, transparent 0.55px);
+      background-size: 3px 3px;
+      mix-blend-mode: soft-light;
+    }
+
+    .login-shell {
+      width: min(100%, 520px);
+      animation: revealRise 900ms cubic-bezier(.22,.84,.22,1) both;
+    }
+
+    .login-card {
+      border: 1px solid var(--line-soft);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: linear-gradient(165deg, rgba(6, 16, 31, 0.86), rgba(5, 12, 24, 0.72));
+      border-radius: 28px;
+      box-shadow: var(--shadow-main);
+    }
+
+    .login-card {
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+      animation: revealRise 900ms cubic-bezier(.22,.84,.22,1) both;
+      animation-delay: 120ms;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      inset: -35% auto auto -30%;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(43, 222, 255, 0.3) 0%, rgba(12, 56, 146, 0.12) 48%, transparent 72%);
+      filter: blur(6px);
+      animation: cinematicGlow 7s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    .login-card .radar-ring {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 560px;
+      height: 560px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(127, 217, 255, 0.12);
+      box-shadow:
+        0 0 0 48px rgba(52, 141, 255, 0.03),
+        0 0 0 110px rgba(45, 126, 255, 0.025),
+        inset 0 0 80px rgba(29, 109, 243, 0.1);
+      pointer-events: none;
+      animation: radarRotate 18s linear infinite;
+    }
+
+    .login-card .radar-ring::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 50%;
+      border-top: 2px solid rgba(129, 232, 255, 0.66);
+      border-right: 2px solid transparent;
+      border-bottom: 2px solid transparent;
+      border-left: 2px solid transparent;
+      filter: drop-shadow(0 0 12px rgba(126, 229, 255, 0.45));
+    }
+
+    .login-card::after {
+      content: '';
+      position: absolute;
+      inset: auto -70px -90px auto;
+      width: 290px;
+      height: 290px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34, 219, 255, 0.34), rgba(17, 82, 212, 0.16) 52%, transparent 72%);
+      animation: cinematicGlowSecondary 9s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    .login-title {
+      margin: 4px 0 8px;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 30px;
+      line-height: 1.2;
+      letter-spacing: 0.015em;
+      animation: revealRise 640ms ease both;
+      animation-delay: 440ms;
+    }
+
+    .login-subtitle {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+      animation: revealRise 640ms ease both;
+      animation-delay: 520ms;
+    }
+
+    .status-chip {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--chip-bg);
+      border: 1px solid var(--line-strong);
+      color: #baf4ff;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 7px 12px;
+      animation: revealRise 640ms ease both;
+      animation-delay: 600ms;
+    }
+
+    .login-action {
+      margin-top: 26px;
+      animation: revealRise 700ms ease both;
+      animation-delay: 680ms;
+    }
+
+    .google-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-family: 'Manrope', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #e8f9ff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(95deg, #0aa7de 0%, #2669ff 100%);
+      box-shadow: 0 12px 30px rgba(15, 143, 224, 0.34);
+      transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .google-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.25) 48%, transparent 72%);
+      transform: translateX(-120%);
+      transition: transform 360ms ease;
+    }
+
+    .google-btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.05);
+      box-shadow: 0 18px 34px rgba(21, 151, 235, 0.45);
+    }
+
+    .google-btn:hover::before {
+      transform: translateX(120%);
+    }
+
+    .google-btn:active {
+      transform: translateY(0);
+    }
+
+    .google-btn:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 6px rgba(100, 214, 255, 0.22);
+    }
+
+    .shield-note {
+      margin-top: 13px;
+      color: #89a3be;
+      font-size: 12px;
+      line-height: 1.5;
+      animation: revealRise 640ms ease both;
+      animation-delay: 760ms;
+    }
+
+    @keyframes revealRise {
+      from { opacity: 0; transform: translateY(14px) scale(0.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes driftMesh {
+      0% { transform: translate3d(-2%, -2.5%, 0) scale(1.02); }
+      50% { transform: translate3d(2.8%, 3.2%, 0) scale(1.1); }
+      100% { transform: translate3d(-1.8%, 2.2%, 0) scale(1.04); }
+    }
+
+    @keyframes gridPulse {
+      0%, 100% { opacity: 0.24; }
+      50% { opacity: 0.4; }
+    }
+
+    @keyframes beamSweep {
+      0% { transform: translate3d(-38%, -18%, 0) rotate(-8deg); opacity: 0; }
+      12% { opacity: 0.9; }
+      55% { opacity: 0.5; }
+      100% { transform: translate3d(36%, 16%, 0) rotate(-8deg); opacity: 0; }
+    }
+
+    @keyframes radarRotate {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes cinematicGlow {
+      0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.5; }
+      100% { transform: translate3d(-10px, -22px, 0) scale(1.08); opacity: 0.8; }
+    }
+
+    @keyframes cinematicGlowSecondary {
+      0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.45; }
+      100% { transform: translate3d(14px, -18px, 0) scale(1.12); opacity: 0.75; }
+    }
+
+    @media (max-width: 980px) {
+      .login-card {
+        padding: 24px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+
+      .login-card {
+        border-radius: 22px;
+      }
+
+      .login-card {
+        padding: 20px;
+      }
+
+      .login-title {
+        font-size: 25px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-  <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
-    <h1 class="text-xl font-bold text-slate-800 mb-2">ETC Jira Dashboard</h1>
-    <p class="text-slate-500 text-sm mb-6">Đăng nhập bằng tài khoản Google đã được cấp quyền.</p>
-    <a id="loginBtn" href="/api/auth/login" class="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
-      Đăng nhập Google
-    </a>
-  </div>
+<body>
+  <canvas id="networkCanvas" class="network-canvas" aria-hidden="true"></canvas>
+  <div class="bg-layer mesh"></div>
+  <div class="bg-layer grid"></div>
+  <div class="bg-layer beam"></div>
+  <div class="bg-layer scanline noise"></div>
+
+  <main class="login-shell" aria-label="Đăng nhập hệ thống Jira Dashboard">
+    <section class="login-card">
+      <div class="radar-ring" aria-hidden="true"></div>
+      <p class="status-chip">Secure Channel Established</p>
+      <h2 class="login-title">Đăng nhập</h2>
+      <p class="login-subtitle">
+        Sử dụng tài khoản Google đã được cấp quyền để tiếp tục vào hệ thống báo cáo Jira.
+      </p>
+
+      <div class="login-action">
+        <a id="loginBtn" href="/api/auth/login" class="google-btn" aria-label="Đăng nhập bằng Google">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M21.35 12.2c0-.73-.06-1.26-.19-1.81H12v3.52h5.38c-.11.88-.71 2.21-2.05 3.11l-.02.12 2.97 2.3.2.02c1.83-1.69 2.87-4.17 2.87-7.26z" fill="#f2f7ff"/>
+            <path d="M12 21.75c2.63 0 4.84-.87 6.45-2.35l-3.07-2.38c-.82.58-1.93.98-3.38.98-2.57 0-4.74-1.69-5.52-4.03l-.11.01-3.08 2.39-.03.11C5.06 19.87 8.27 21.75 12 21.75z" fill="#f2f7ff"/>
+            <path d="M6.48 13.97A5.77 5.77 0 016.16 12c0-.68.12-1.34.31-1.97l-.01-.13-3.12-2.42-.1.05A9.75 9.75 0 002.25 12c0 1.57.38 3.06 1.08 4.37l3.15-2.4z" fill="#f2f7ff"/>
+            <path d="M12 6c1.85 0 3.1.8 3.8 1.47l2.78-2.72C16.83 3.15 14.63 2.25 12 2.25c-3.73 0-6.94 1.88-8.67 4.72l3.23 2.5C7.26 7.69 9.43 6 12 6z" fill="#f2f7ff"/>
+          </svg>
+          Đăng nhập với Google
+        </a>
+        <p class="shield-note">
+          Chỉ tài khoản đã được cấp quyền mới truy cập được.
+        </p>
+      </div>
+    </section>
+  </main>
+
   <script>
     const q = new URLSearchParams(window.location.search);
     const next = q.get('next') || '/';
     document.getElementById('loginBtn').href = '/api/auth/login?next=' + encodeURIComponent(next);
+
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let nodes = [];
+    let animationFrame = null;
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+
+    function resizeNetwork() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const count = Math.min(150, Math.max(76, Math.floor((width * height) / 9500)));
+      nodes = Array.from({ length: count }, (_, index) => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.11,
+        vy: (Math.random() - 0.5) * 0.11,
+        r: index % 7 === 0 ? 2.2 : 1.35,
+        phase: Math.random() * Math.PI * 2
+      }));
+
+      drawNetwork(0);
+    }
+
+    function drawNetwork(time) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = 'round';
+
+      const linkDistance = Math.min(250, Math.max(170, width * 0.17));
+      const pulse = (Math.sin(time * 0.0012) + 1) / 2;
+
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+
+        if (!reducedMotion) {
+          node.x += node.vx;
+          node.y += node.vy;
+
+          if (node.x < -20) node.x = width + 20;
+          if (node.x > width + 20) node.x = -20;
+          if (node.y < -20) node.y = height + 20;
+          if (node.y > height + 20) node.y = -20;
+        }
+
+        for (let j = i + 1; j < nodes.length; j++) {
+          const other = nodes[j];
+          const dx = node.x - other.x;
+          const dy = node.y - other.y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance < linkDistance) {
+            const alpha = (1 - distance / linkDistance) * 0.28;
+            const gradient = ctx.createLinearGradient(node.x, node.y, other.x, other.y);
+            gradient.addColorStop(0, `rgba(37, 211, 255, ${alpha})`);
+            gradient.addColorStop(0.5, `rgba(115, 242, 255, ${alpha + pulse * 0.06})`);
+            gradient.addColorStop(1, `rgba(72, 132, 255, ${alpha * 0.75})`);
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.moveTo(node.x, node.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const node of nodes) {
+        const glow = 0.45 + Math.sin(time * 0.002 + node.phase) * 0.18;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(168, 246, 255, ${glow})`;
+        ctx.shadowColor = 'rgba(33, 218, 255, 0.7)';
+        ctx.shadowBlur = 12;
+        ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      if (!reducedMotion) {
+        animationFrame = requestAnimationFrame(drawNetwork);
+      }
+    }
+
+    resizeNetwork();
+    window.addEventListener('resize', resizeNetwork);
+    if (!reducedMotion) {
+      animationFrame = requestAnimationFrame(drawNetwork);
+    }
   </script>
 </body>
 </html>
-
