@@ -664,30 +664,39 @@
 
     async function loadDailyLogworkData() {
       try {
+        var applyBtn = document.querySelector('#dailyLogworkModal button[onclick="loadDailyLogworkData()"]');
+        if (applyBtn) {
+          applyBtn.disabled = true;
+          applyBtn.textContent = 'Đang tải...';
+        }
         var dateStr = dailyLogworkDate || toJiraDate(new Date());
         dailyLogworkDate = dateStr;
         var jql = 'worklogDate = "' + dateStr + '"';
         var issues = await fetchAllIssues(jql);
         var logsByUser = {};
-        for (var i = 0; i < issues.length; i++) {
-          var issueKey = issues[i] && issues[i].key;
-          if (!issueKey) continue;
-          var worklogs = [];
+        var issueKeys = issues.map(function(x) { return x && x.key; }).filter(Boolean);
+        var worklogResults = await Promise.all(issueKeys.map(async function(issueKey) {
           try {
-            worklogs = await fetchIssueWorklogs(issueKey);
+            return await fetchIssueWorklogs(issueKey);
           } catch (e) {
-            worklogs = [];
+            return [];
           }
+        }));
+
+        worklogResults.forEach(function(worklogs) {
           worklogs.forEach(function(wl) {
-            var started = String((wl || {}).started || '');
-            if (!started || started.slice(0, 10) !== dateStr) return;
+            var started = (wl || {}).started;
+            if (!started) return;
+            var startedDate = new Date(started);
+            if (Number.isNaN(startedDate.getTime())) return;
+            if (toJiraDate(startedDate) !== dateStr) return;
             var author = (wl || {}).author || {};
             var uid = author.accountId || author.key || author.name || author.emailAddress || author.displayName || 'unknown';
             var uname = author.displayName || author.name || author.emailAddress || uid;
             if (!logsByUser[uid]) logsByUser[uid] = { id: uid, name: uname, seconds: 0 };
             logsByUser[uid].seconds += wl.timeSpentSeconds || 0;
           });
-        }
+        });
 
         var rows = Object.keys(logsByUser).map(function(id) {
           return { id: logsByUser[id].id, name: logsByUser[id].name, hours: +(logsByUser[id].seconds / 3600).toFixed(1) };
@@ -709,6 +718,12 @@
         console.error(err);
         showToast('Không tải được dữ liệu logwork theo ngày', true);
         renderDailyLogworkChart([]);
+      } finally {
+        var applyBtnDone = document.querySelector('#dailyLogworkModal button[onclick="loadDailyLogworkData()"]');
+        if (applyBtnDone) {
+          applyBtnDone.disabled = false;
+          applyBtnDone.textContent = 'Áp dụng';
+        }
       }
     }
 
