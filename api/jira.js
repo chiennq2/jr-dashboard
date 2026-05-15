@@ -42,6 +42,7 @@ module.exports = async (req, res) => {
   const jiraBase = process.env.JIRA_BASE || '';
   const jiraToken = process.env.JIRA_TOKEN || '';
   const allowSelfSigned = String(process.env.JIRA_ALLOW_SELF_SIGNED || '').toLowerCase() === 'true';
+  const httpsAgent = allowSelfSigned ? new https.Agent({ rejectUnauthorized: false }) : undefined;
 
   if (!jiraBase || !jiraToken) {
     res.status(500).json({ error: 'Missing JIRA_BASE or JIRA_TOKEN environment variables' });
@@ -61,7 +62,8 @@ module.exports = async (req, res) => {
         Authorization: `Bearer ${jiraToken}`,
         'Content-Type': 'application/json'
       },
-      rejectUnauthorized: !allowSelfSigned
+      rejectUnauthorized: !allowSelfSigned,
+      agent: httpsAgent
     },
     (upstreamRes) => {
       let body = '';
@@ -82,4 +84,3 @@ module.exports = async (req, res) => {
 
   upstream.end();
 };
-
