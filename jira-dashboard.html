@@ -1175,7 +1175,7 @@
       ctx.fillText('Jira Dashboard', 60, 72);
       ctx.fillStyle = '#475569';
       ctx.font = '400 22px Inter, sans-serif';
-      ctx.fillText('Xuat luc: ' + new Date().toLocaleString('vi-VN'), 60, 110);
+      ctx.fillText('Time: ' + new Date().toLocaleString('vi-VN'), 60, 110);
 
       var cardW = 620;
       var cardH = 560;
@@ -1198,7 +1198,7 @@
       ctx.font = '600 24px Inter, sans-serif';
       ctx.fillText('Giờ theo trạng thái', leftX + 24, y + 38);
       ctx.fillText('Estimated vs Thực tế', midX + 24, y + 38);
-      ctx.fillText('ULNN theo Assignee', rightX + 24, y + 38);
+      ctx.fillText('ULNN', rightX + 24, y + 38);
 
       var img1 = new Image();
       var img2 = new Image();
@@ -1581,7 +1581,7 @@
                   var estH = toHours(assigneeMap[key].est || 0);
                   var logH = toHours(assigneeMap[key].log || 0);
                   var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[key] || {}).length;
-                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Σ logwork: ' + ngayCongAssignee;
+                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Σ Ngày Công: ' + ngayCongAssignee;
                 }
               }
             }
