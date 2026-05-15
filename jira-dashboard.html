@@ -223,6 +223,7 @@
     let allProjects = [];
     let selectedProjectKeys = [];
     let currentDateRange = null;
+    let issueWorklogsByKey = {};
     let dailyLogworkDate = null;
     let dailySelectedUsers = [];
     let dailyCachedUsers = null;
@@ -1002,6 +1003,19 @@
       return results;
     }
 
+    async function fetchIssueWorklogs(issueKey) {
+      var startAt = 0, total = Infinity, results = [];
+      while (startAt < total) {
+        var data = await jiraFetch('/rest/api/2/issue/' + encodeURIComponent(issueKey) + '/worklog?startAt=' + startAt + '&maxResults=100');
+        var worklogs = data.worklogs || [];
+        total = data.total || 0;
+        results = results.concat(worklogs);
+        startAt += worklogs.length;
+        if (!worklogs.length) break;
+      }
+      return results;
+    }
+
     function parseIsoDateOnly(iso) {
       if (!iso) return null;
       var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1023,6 +1037,34 @@
         if (isWeekday(d)) count++;
       }
       return count;
+    }
+
+    function toDateKey(d) {
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+
+    function buildAssigneeWeekdayLogMap(issues, range, worklogByIssueKey) {
+      var out = {};
+      var start = parseIsoDateOnly((range || {}).startDate);
+      var end = parseIsoDateOnly((range || {}).endDate);
+      if (!start || !end || start > end) return out;
+      var startKey = toDateKey(start);
+      var endKey = toDateKey(end);
+      issues.forEach(function(issue) {
+        var key = issue && issue.key;
+        var issueAssignee = (((issue || {}).fields || {}).assignee) || {};
+        var assigneeName = issueAssignee.displayName || issueAssignee.name || 'Unassigned';
+        if (!out[assigneeName]) out[assigneeName] = {};
+        var logs = (worklogByIssueKey || {})[key] || [];
+        logs.forEach(function(wl) {
+          var logDate = parseIsoDateOnly(wl.started);
+          if (!logDate || !isWeekday(logDate)) return;
+          var dayKey = toDateKey(logDate);
+          if (dayKey < startKey || dayKey > endKey) return;
+          out[assigneeName][dayKey] = true;
+        });
+      });
+      return out;
     }
 
     function toHours(seconds) {
@@ -1278,6 +1320,17 @@
           });
         }
 
+        issueWorklogsByKey = {};
+        for (var wi = 0; wi < allIssues.length; wi++) {
+          var issueKey = allIssues[wi] && allIssues[wi].key;
+          if (!issueKey) continue;
+          try {
+            issueWorklogsByKey[issueKey] = await fetchIssueWorklogs(issueKey);
+          } catch (e) {
+            issueWorklogsByKey[issueKey] = [];
+          }
+        }
+
         currentIssuePage = 1;
 
         renderDashboard();
@@ -1436,7 +1489,7 @@
 
       // ---- ULNN by assignee ----
       var assigneeMap = {};
-      var ngayCongAssignee = countWeekdaysInRange((currentDateRange || {}).startDate, (currentDateRange || {}).endDate);
+      var assigneeWeekdayLogMap = buildAssigneeWeekdayLogMap(allIssues, currentDateRange, issueWorklogsByKey);
       allIssues.forEach(function(i) {
         var s = normalizeStatus(i.fields.status);
         var tt = i.fields.timetracking || {};
@@ -1452,6 +1505,7 @@
       var ulnnLabels = Object.keys(assigneeMap);
       var ulnnData = ulnnLabels.map(function(k) {
         var estHours = (assigneeMap[k].est || 0) / 3600;
+        var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[k] || {}).length;
         return estHours > 0 ? +(ngayCongAssignee * 7 / estHours).toFixed(3) : 0;
       });
 
@@ -1473,7 +1527,7 @@
             meta.data.forEach(function(bar, i) {
               var v = data[i];
               if (v === null || typeof v === 'undefined') return;
-              ctx.fillText((v * 100).toFixed(1) + '%', bar.x, bar.y - 4);
+              ctx.fillText(Number(v).toFixed(3), bar.x, bar.y - 4);
             });
             ctx.restore();
           }
@@ -1499,7 +1553,8 @@
                   var key = ctx.label || '';
                   var estH = toHours(assigneeMap[key].est || 0);
                   var logH = toHours(assigneeMap[key].log || 0);
-                  return 'ULNN: ' + (ctx.parsed.y * 100).toFixed(1) + '% | Est: ' + estH + 'h | Log: ' + logH + 'h | Ngay cong weekday: ' + ngayCongAssignee;
+                  var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[key] || {}).length;
+                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | So ngay co logwork: ' + ngayCongAssignee;
                 }
               }
             }
@@ -1509,7 +1564,7 @@
             y: {
               beginAtZero: true,
               grid: { color: '#f1f5f9' },
-              ticks: { font: { size: 11 }, callback: function(v) { return (Number(v) * 100).toFixed(0) + '%'; } }
+              ticks: { font: { size: 11 }, callback: function(v) { return Number(v).toFixed(2); } }
             }
           }
         }
