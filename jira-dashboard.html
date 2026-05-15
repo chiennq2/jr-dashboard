@@ -47,6 +47,10 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
           Xuất báo cáo
         </button>
+        <button onclick="openDailyLogworkModal()" class="bg-amber-500/90 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          Logwork theo ngày
+        </button>
         <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Tải lại
@@ -165,6 +169,39 @@
   </main>
 
   <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium hidden z-50 items-center gap-2"></div>
+  <div id="dailyLogworkModal" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-slate-900/50" onclick="closeDailyLogworkModal()"></div>
+    <div class="relative mx-auto mt-10 w-[92vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">Logwork theo ngày (theo assignee)</h3>
+        <button onclick="closeDailyLogworkModal()" class="text-slate-500 hover:text-slate-700 text-sm font-semibold">Đóng</button>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-4 items-end">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ngày</label>
+          <input id="dailyLogworkDate" class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-[200px]" readonly />
+        </div>
+        <div class="flex flex-col gap-1.5 flex-1 min-w-[280px]">
+          <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tài khoản / Tên</label>
+          <div class="relative">
+            <div id="dailyUserChips" class="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-slate-300 rounded-lg bg-white cursor-text" onclick="document.getElementById('dailyUserInput').focus()">
+              <div id="dailyUserTags"></div>
+              <input id="dailyUserInput" type="text" autocomplete="off" placeholder="Chọn nhiều tài khoản..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
+              <button id="clearDailyUsers" type="button" onclick="clearDailyUsers()" class="hidden ml-auto text-xs font-semibold text-slate-500 hover:text-slate-700">Xóa</button>
+            </div>
+            <div id="dailyUserDropdown" class="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 w-full max-h-56 overflow-y-auto hidden"></div>
+          </div>
+        </div>
+        <button onclick="loadDailyLogworkData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium">Áp dụng</button>
+      </div>
+      <div class="p-6">
+        <div id="dailyLogworkEmpty" class="hidden text-center text-slate-400 py-16 text-sm font-medium">Không có logwork trong ngày</div>
+        <div id="dailyLogworkCanvasWrap" style="height:380px">
+          <canvas id="dailyLogworkChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     const JIRA_BASE = 'https://20.84.97.109:3033';
@@ -178,6 +215,7 @@
     let statusChart = null;
     let barChart = null;
     let ulnnChart = null;
+    let dailyLogworkChart = null;
     let loadTimer = null;
     let currentIssuePage = 1;
     let issuePageSize = 20;
@@ -185,6 +223,10 @@
     let allProjects = [];
     let selectedProjectKeys = [];
     let currentDateRange = null;
+    let dailyLogworkDate = null;
+    let dailySelectedUsers = [];
+    let dailyCachedUsers = null;
+    let dailyUserFetchTimer = null;
     const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -192,6 +234,8 @@
       async function safeInit() {
         try { initFlatpickr(); } catch(e) { console.error('flatpickr init error', e); }
         try { initAssigneeAutocomplete(); } catch(e) { console.error('assignee init error', e); }
+        try { initDailyLogworkPicker(); } catch(e) { console.error('daily picker init error', e); }
+        try { initDailyUserAutocomplete(); } catch(e) { console.error('daily user init error', e); }
         try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
         try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
         try { await loadData(); } catch(e) { console.error('loadData error', e); }
@@ -339,30 +383,8 @@
           showDropdown([]);
           return;
         }
-
-        // Try endpoints in order: assignable (best, filters by project) > username > query
-        var selectedProjects = getSelectedProjectKeys();
-        var projectKey = selectedProjects.length ? selectedProjects[0] : '';
-        var assignableEndpoint = projectKey
-          ? '/rest/api/2/user/assignable/search?project=' + encodeURIComponent(projectKey) + '&query=' + encodeURIComponent(q) + '&maxResults=50'
-          : '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50';
-        var endpoints = [
-          assignableEndpoint,
-          '/rest/api/2/user/search?username=' + encodeURIComponent(q) + '&maxResults=50',
-          '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50'
-        ];
-
-        var data = [];
-        for (var i = 0; i < endpoints.length; i++) {
-          try {
-            data = await jiraFetch(endpoints[i]);
-            if (Array.isArray(data)) break;
-          } catch (e) {
-            if (i === endpoints.length - 1) throw e;
-          }
-        }
-
-        cachedUsers = uniqueUsers((data || []).map(normalizeUser)).sort(function(a, b) {
+        var users = await searchUsers(q, true);
+        cachedUsers = users.sort(function(a, b) {
           return a.name.localeCompare(b.name);
         });
         cachedUserQuery = q;
@@ -371,6 +393,309 @@
         cachedUsers = [];
         cachedUserQuery = '';
         showDropdown([]);
+      }
+    }
+
+    async function searchUsers(query, useProjectAssignable) {
+      var q = (query || '').trim();
+      if (!q) return [];
+      var selectedProjects = getSelectedProjectKeys();
+      var projectKey = selectedProjects.length ? selectedProjects[0] : '';
+      var firstEndpoint = (useProjectAssignable && projectKey)
+        ? '/rest/api/2/user/assignable/search?project=' + encodeURIComponent(projectKey) + '&query=' + encodeURIComponent(q) + '&maxResults=50'
+        : '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50';
+      var endpoints = [
+        firstEndpoint,
+        '/rest/api/2/user/search?username=' + encodeURIComponent(q) + '&maxResults=50',
+        '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50'
+      ];
+      var data = [];
+      for (var i = 0; i < endpoints.length; i++) {
+        try {
+          data = await jiraFetch(endpoints[i]);
+          if (Array.isArray(data)) break;
+        } catch (e) {
+          if (i === endpoints.length - 1) throw e;
+        }
+      }
+      return uniqueUsers((data || []).map(normalizeUser));
+    }
+
+    function toJiraDate(d) {
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+
+    function initDailyLogworkPicker() {
+      if (typeof flatpickr === 'undefined') return;
+      var today = new Date();
+      dailyLogworkDate = toJiraDate(today);
+      flatpickr('#dailyLogworkDate', {
+        mode: 'single',
+        defaultDate: [today],
+        dateFormat: 'd/m/Y',
+        maxDate: today,
+        onChange: function(selectedDates) {
+          if (!selectedDates || !selectedDates.length) return;
+          dailyLogworkDate = toJiraDate(selectedDates[0]);
+        }
+      });
+    }
+
+    function openDailyLogworkModal() {
+      var modal = document.getElementById('dailyLogworkModal');
+      modal.classList.remove('hidden');
+      if (!dailyLogworkDate) {
+        var now = new Date();
+        dailyLogworkDate = toJiraDate(now);
+      }
+      loadDailyLogworkData();
+    }
+
+    function closeDailyLogworkModal() {
+      var modal = document.getElementById('dailyLogworkModal');
+      modal.classList.add('hidden');
+    }
+
+    function initDailyUserAutocomplete() {
+      var input = document.getElementById('dailyUserInput');
+      var dropdown = document.getElementById('dailyUserDropdown');
+      if (!input || !dropdown) return;
+
+      input.addEventListener('focus', function() {
+        var val = input.value.trim();
+        if (!val) return;
+        if (!dailyCachedUsers) scheduleDailyUserFetch(val);
+        else showDailyUserDropdown(filterDailyUsers(val));
+      });
+
+      input.addEventListener('input', function() {
+        var val = input.value.trim();
+        if (!val) {
+          dropdown.classList.add('hidden');
+          return;
+        }
+        if (dailyCachedUsers && dailyCachedUsers.length) {
+          showDailyUserDropdown(filterDailyUsers(val));
+        }
+        scheduleDailyUserFetch(val);
+      });
+
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var matches = filterDailyUsers(input.value.trim());
+          if (matches.length > 0) selectDailyUser(matches[0]);
+        }
+        if (e.key === 'Backspace' && !input.value && dailySelectedUsers.length > 0) {
+          removeDailyUser(dailySelectedUsers.length - 1);
+        }
+      });
+
+      input.addEventListener('blur', function() {
+        setTimeout(function() { dropdown.classList.add('hidden'); }, 300);
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!document.getElementById('dailyUserChips').contains(e.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+
+      renderDailyUserTags();
+    }
+
+    function scheduleDailyUserFetch(query) {
+      clearTimeout(dailyUserFetchTimer);
+      dailyUserFetchTimer = setTimeout(function() { fetchDailyUserList(query); }, 220);
+    }
+
+    async function fetchDailyUserList(query) {
+      try {
+        var q = (query || '').trim();
+        if (!q) {
+          dailyCachedUsers = [];
+          showDailyUserDropdown([]);
+          return;
+        }
+        dailyCachedUsers = (await searchUsers(q, false)).sort(function(a, b) {
+          return a.name.localeCompare(b.name);
+        });
+        showDailyUserDropdown(filterDailyUsers(document.getElementById('dailyUserInput').value.trim()));
+      } catch (e) {
+        dailyCachedUsers = [];
+        showDailyUserDropdown([]);
+      }
+    }
+
+    function filterDailyUsers(query) {
+      if (!dailyCachedUsers || !query) return [];
+      var q = query.toLowerCase();
+      return dailyCachedUsers.filter(function(u) {
+        return (u.name || '').toLowerCase().includes(q)
+          || (u.email || '').toLowerCase().includes(q)
+          || (u.username || '').toLowerCase().includes(q)
+          || (u.key || '').toLowerCase().includes(q)
+          || (u.id || '').toLowerCase().includes(q);
+      }).slice(0, 10);
+    }
+
+    function showDailyUserDropdown(users) {
+      var dropdown = document.getElementById('dailyUserDropdown');
+      if (!dropdown) return;
+      if (!users.length) { dropdown.classList.add('hidden'); return; }
+      dropdown.innerHTML = users.map(function(u) {
+        return '<button type="button" data-user-id="' + escapeHtml(u.id) + '" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2">' +
+          '<div class="w-7 h-7 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">' + escapeHtml((u.name || '?').charAt(0).toUpperCase()) + '</div>' +
+          '<div><div class="font-medium">' + escapeHtml(u.name) + '</div><div class="text-xs text-slate-400">' + escapeHtml(u.email || u.username || u.id) + '</div></div>' +
+        '</button>';
+      }).join('');
+      var buttons = dropdown.querySelectorAll('button[data-user-id]');
+      buttons.forEach(function(btn) {
+        btn.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          var id = this.getAttribute('data-user-id');
+          var user = users.find(function(u) { return u.id === id; });
+          if (user) selectDailyUser(user);
+        });
+      });
+      dropdown.classList.remove('hidden');
+    }
+
+    function renderDailyUserTags() {
+      var tags = document.getElementById('dailyUserTags');
+      var clearBtn = document.getElementById('clearDailyUsers');
+      if (!tags || !clearBtn) return;
+      tags.innerHTML = dailySelectedUsers.map(function(a, idx) {
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">'
+          + escapeHtml(a.name)
+          + '<button type="button" onclick="removeDailyUser(' + idx + ')" class="text-amber-500 hover:text-amber-700">×</button>'
+          + '</span>';
+      }).join('');
+      if (dailySelectedUsers.length > 0) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+
+    function selectDailyUser(user) {
+      if (!user || !user.id) return;
+      var exists = dailySelectedUsers.some(function(a) { return a.id === user.id; });
+      if (exists) {
+        document.getElementById('dailyUserInput').value = '';
+        document.getElementById('dailyUserDropdown').classList.add('hidden');
+        return;
+      }
+      dailySelectedUsers.push({
+        id: user.id,
+        accountId: user.accountId || '',
+        username: user.username || '',
+        key: user.key || '',
+        name: user.name || user.username || user.id
+      });
+      renderDailyUserTags();
+      document.getElementById('dailyUserInput').value = '';
+      document.getElementById('dailyUserDropdown').classList.add('hidden');
+    }
+
+    function removeDailyUser(index) {
+      if (index < 0 || index >= dailySelectedUsers.length) return;
+      dailySelectedUsers.splice(index, 1);
+      renderDailyUserTags();
+    }
+
+    function clearDailyUsers() {
+      dailySelectedUsers = [];
+      document.getElementById('dailyUserInput').value = '';
+      renderDailyUserTags();
+    }
+
+    function renderDailyLogworkChart(rows) {
+      var emptyEl = document.getElementById('dailyLogworkEmpty');
+      var canvasWrap = document.getElementById('dailyLogworkCanvasWrap');
+      if (!rows.length) {
+        if (dailyLogworkChart) {
+          dailyLogworkChart.destroy();
+          dailyLogworkChart = null;
+        }
+        emptyEl.classList.remove('hidden');
+        canvasWrap.classList.add('hidden');
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      canvasWrap.classList.remove('hidden');
+      if (dailyLogworkChart) dailyLogworkChart.destroy();
+      var ctx = document.getElementById('dailyLogworkChart').getContext('2d');
+      dailyLogworkChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: rows.map(function(r) { return r.name; }),
+          datasets: [{
+            label: 'Logwork (h)',
+            data: rows.map(function(r) { return r.hours; }),
+            backgroundColor: 'rgba(59,130,246,0.85)',
+            borderRadius: 8,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  return (ctx.label || '') + ': ' + Number(ctx.parsed.y || 0).toFixed(1) + 'h';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, callback: function(v) { return v + 'h'; } } }
+          }
+        }
+      });
+    }
+
+    async function loadDailyLogworkData() {
+      try {
+        var dateStr = dailyLogworkDate || toJiraDate(new Date());
+        dailyLogworkDate = dateStr;
+        var jql = 'worklogDate = "' + dateStr + '"';
+        var issues = await fetchAllIssues(jql);
+        var assigneeMap = {};
+        issues.forEach(function(i) {
+          var tt = i.fields.timetracking || {};
+          var aobj = i.fields.assignee || {};
+          var aname = aobj.displayName || aobj.name || 'Unassigned';
+          var aid = aobj.accountId || aobj.key || aobj.name || aname;
+          if (!assigneeMap[aid]) assigneeMap[aid] = { id: aid, name: aname, seconds: 0 };
+          assigneeMap[aid].seconds += tt.timeSpentSeconds || 0;
+        });
+
+        var rows = Object.keys(assigneeMap).map(function(id) {
+          return { id: assigneeMap[id].id, name: assigneeMap[id].name, hours: +(assigneeMap[id].seconds / 3600).toFixed(1) };
+        }).filter(function(r) {
+          return r.hours > 0;
+        }).sort(function(a, b) {
+          return b.hours - a.hours;
+        });
+
+        if (dailySelectedUsers.length) {
+          var selected = {};
+          dailySelectedUsers.forEach(function(u) {
+            selected[u.accountId || u.key || u.username || u.name] = true;
+          });
+          rows = rows.filter(function(r) { return !!selected[r.id]; });
+        } else {
+          rows = rows.slice(0, 10);
+        }
+
+        renderDailyLogworkChart(rows);
+      } catch (err) {
+        console.error(err);
+        showToast('Không tải được dữ liệu logwork theo ngày', true);
+        renderDailyLogworkChart([]);
       }
     }
 
