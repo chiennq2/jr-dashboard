@@ -1,4 +1,5 @@
 const https = require('https');
+const { requireSession } = require('./_auth');
 
 function normalizePath(pathValue) {
   return String(pathValue || '')
@@ -36,6 +37,12 @@ module.exports = async (req, res) => {
 
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const session = requireSession(req);
+  if (!session) {
+    res.status(401).json({ error: 'Unauthorized' });
     return;
   }
 

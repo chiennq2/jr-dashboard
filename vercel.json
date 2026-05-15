@@ -5,8 +5,16 @@
       "destination": "/api/jira?path=:path*"
     },
     {
-      "source": "/",
-      "destination": "/jira-dashboard.html"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/app"
     }
   ]
 }
