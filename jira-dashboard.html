@@ -167,7 +167,8 @@
 
   <script>
     const JIRA_BASE = 'https://20.84.97.109:3033';
-    const PROXY_BASE = ''; // use relative /jira proxy
+    const API_BASE = '/api/jira';
+    const LOCAL_PROXY_BASE = '/jira';
     const PROJECT_KEY = 'BCAC';
     const ALL_PROJECTS_VALUE = 'all';
     const FIELDS = 'summary,status,assignee,created,priority,issuetype,timetracking';
@@ -649,9 +650,12 @@
     }
 
     async function jiraFetch(url) {
-      var r = await fetch(url.startsWith('/') ? '/jira' + url : '/jira' + JIRA_BASE + url, {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      var targetPath = url.startsWith('/') ? url : String(url || '').replace(JIRA_BASE, '');
+      var r = await fetch(API_BASE + targetPath, { headers: { 'Content-Type': 'application/json' } });
+      if (!r.ok && (r.status === 404 || r.status === 405)) {
+        // Local fallback when running the old node proxy server.
+        r = await fetch(LOCAL_PROXY_BASE + targetPath, { headers: { 'Content-Type': 'application/json' } });
+      }
       if (!r.ok) {
         var text = await r.text();
         throw new Error('Jira API error ' + r.status + ': ' + text.substring(0, 200));
