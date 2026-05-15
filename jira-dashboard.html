@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jira Dashboard - ETC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+    .filter-bar { backdrop-filter: blur(10px); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .spinner { border: 3px solid #e2e8f0; border-top: 3px solid #3b82f6; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .tag-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .status-OPEN { background:#fef3c7;color:#92400e; }
+    .status-IN_PROGRESS { background:#dbeafe;color:#1e40af; }
+    .status-RESOLVED { background:#d1fae5;color:#065f46; }
+    .status-CLOSED { background:#e0e7ff;color:#3730a3; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <header class="bg-gradient-to-r from-[#0052CC] to-[#0065FF] text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">ETC Jira Dashboard</h1>
+          <p class="text-blue-200 text-xs">ETC Project &bull; Tự động cập nhật mỗi lần tải lại</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="refreshTime" class="text-blue-200 text-sm hidden"></div>
+        <button onclick="exportReportImage()" class="bg-emerald-500/90 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Xuất báo cáo
+        </button>
+        <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Tải lại
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="filter-bar bg-white/90 shadow-md sticky top-0 z-20 border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Khoảng ngày</label>
+        <input id="dateRange" class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-[240px]" readonly />
+      </div>
+      <div class="flex flex-col gap-1.5 flex-1 min-w-[220px]">
+        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tài khoản / Tên</label>
+        <div class="relative">
+          <div id="assigneeChips" class="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-slate-300 rounded-lg bg-white cursor-text" onclick="document.getElementById('assigneeInput').focus()">
+            <div id="assigneeTags"></div>
+            <input id="assigneeInput" type="text" autocomplete="off" placeholder="Tìm tên hoặc email..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
+            <button id="clearAssignee" type="button" onclick="clearAssignee()" class="hidden ml-auto text-xs font-semibold text-slate-500 hover:text-slate-700">Xóa</button>
+          </div>
+          <div id="assigneeDropdown" class="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 w-full max-h-56 overflow-y-auto hidden"></div>
+        </div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</label>
+        <select id="statusFilter" onchange="loadData()" class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+          <option value="all">Tất cả</option>
+          <option value="CLOSED">Đã đóng</option>
+          <option value="RESOLVED">Đã giải quyết</option>
+          <option value="IN_PROGRESS">Đang làm</option>
+          <option value="OPEN">Mới</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Project</label>
+        <div class="relative min-w-[260px]">
+          <div id="projectChips" class="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-slate-300 rounded-lg bg-white cursor-text" onclick="document.getElementById('projectInput').focus()">
+            <div id="projectTags"></div>
+            <input id="projectInput" type="text" autocomplete="off" placeholder="Tìm theo key hoặc tên project..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
+            <button id="clearProject" type="button" onclick="clearProjectFilter()" class="hidden ml-auto text-xs font-semibold text-slate-500 hover:text-slate-700">Xóa</button>
+          </div>
+          <div id="projectDropdown" class="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 w-full max-h-56 overflow-y-auto hidden"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-6 py-6">
+    <div id="loadingState" class="flex flex-col items-center justify-center py-20 gap-4">
+      <div class="spinner"></div>
+      <p class="text-slate-500 text-sm font-medium">Đang tải dữ liệu từ Jira...</p>
+    </div>
+
+    <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+      <svg class="w-12 h-12 mx-auto text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <p id="errorMessage" class="text-red-700 font-medium"></p>
+      <button onclick="loadData()" class="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">Thử lại</button>
+    </div>
+
+    <div id="dashboardContent" class="hidden">
+      <div id="statCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">Giờ theo trạng thái</h3>
+          <div style="height:280px"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">Estimated vs Thực tế</h3>
+          <div style="height:280px"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">ULNN theo Assignee</h3>
+          <div style="height:280px"><canvas id="ulnnChart"></canvas></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">Danh sách Issues</h3>
+          <span id="issueCount" class="bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="text-left px-6 py-3 font-semibold text-slate-600 text-xs uppercase">Mã</th>
+                <th class="text-left px-6 py-3 font-semibold text-slate-600 text-xs uppercase">Tiêu đề</th>
+                <th class="text-left px-6 py-3 font-semibold text-slate-600 text-xs uppercase">Project</th>
+                <th class="text-left px-6 py-3 font-semibold text-slate-600 text-xs uppercase">Assignee</th>
+                <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Status</th>
+                <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Estimate</th>
+                <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Logged</th>
+                <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ngày tạo</th>
+              </tr>
+            </thead>
+            <tbody id="issueTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div id="issuePaginationInfo" class="text-xs text-slate-500">0-0 / 0</div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-500">/trang</label>
+            <select id="issuePageSize" onchange="changeIssuePageSize()" class="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-700">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="issuePrevPage" onclick="goToIssuePage(currentIssuePage - 1)" class="px-2.5 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Trước</button>
+            <span id="issuePageText" class="text-xs text-slate-600 min-w-[68px] text-center">1 / 1</span>
+            <button id="issueNextPage" onclick="goToIssuePage(currentIssuePage + 1)" class="px-2.5 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Sau</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium hidden z-50 items-center gap-2"></div>
+
+  <script>
+    const JIRA_BASE = 'https://20.84.97.109:3033';
+    const PROXY_BASE = ''; // use relative /jira proxy
+    const PROJECT_KEY = 'BCAC';
+    const ALL_PROJECTS_VALUE = 'all';
+    const FIELDS = 'summary,status,assignee,created,priority,issuetype,timetracking';
+
+    let allIssues = [];
+    let statusChart = null;
+    let barChart = null;
+    let ulnnChart = null;
+    let loadTimer = null;
+    let currentIssuePage = 1;
+    let issuePageSize = 20;
+    let selectedAssignees = [];
+    let allProjects = [];
+    let selectedProjectKeys = [];
+    const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Scripts load async, wait for them then init
+      async function safeInit() {
+        try { initFlatpickr(); } catch(e) { console.error('flatpickr init error', e); }
+        try { initAssigneeAutocomplete(); } catch(e) { console.error('assignee init error', e); }
+        try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
+        try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
+        try { await loadData(); } catch(e) { console.error('loadData error', e); }
+      }
+      setTimeout(safeInit, 300);
+    });
+
+    function debounceLoad() {
+      clearTimeout(loadTimer);
+      loadTimer = setTimeout(loadData, 500);
+    }
+
+    function getSelectedProjectKeys() {
+      return selectedProjectKeys.slice();
+    }
+
+    function onProjectChange() {
+      cachedUsers = null;
+      cachedUserQuery = '';
+      loadData();
+    }
+
+    // ===== FLATPICKR DATE RANGE =====
+    function initFlatpickr() {
+      if (typeof flatpickr === 'undefined') {
+        // Retry after script loads
+        setTimeout(initFlatpickr, 300);
+        return;
+      }
+      var today = new Date();
+      var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      flatpickr('#dateRange', {
+        mode: 'range',
+        defaultDate: [firstDay, today],
+        dateFormat: 'd/m/Y',
+        maxDate: today,
+        onChange: function(selectedDates) {
+          if (selectedDates.length === 2) loadData();
+        }
+      });
+    }
+
+    // ===== ASSIGNEE AUTOCOMPLETE =====
+    var cachedUsers = null;
+    var userFetchTimer = null;
+    var cachedUserQuery = '';
+
+    function normalizeUser(u) {
+      var accountId = u.accountId || '';
+      var key = u.key || '';
+      var username = u.name || '';
+      var displayName = u.displayName || '';
+      var email = u.emailAddress || '';
+      // For JQL, use accountId (Cloud) or key (Server) - both are JQL-safe
+      var jqlId = accountId || key;
+      // For display, prefer displayName
+      var displayText = displayName || username || key || email || accountId;
+      return {
+        id: jqlId || displayText,
+        jqlId: jqlId,
+        accountId: accountId,
+        key: key,
+        username: username,
+        name: displayText,
+        email: email
+      };
+    }
+
+    function uniqueUsers(users) {
+      var seen = {};
+      return users.filter(function(u) {
+        if (!u.id || seen[u.id]) return false;
+        seen[u.id] = true;
+        return true;
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function initAssigneeAutocomplete() {
+      var input = document.getElementById('assigneeInput');
+      var dropdown = document.getElementById('assigneeDropdown');
+
+      input.addEventListener('focus', function() {
+        var val = input.value.trim();
+        if (!val) return;
+        if (!cachedUsers) scheduleUserFetch(val);
+        else showDropdown(filterUsers(val));
+      });
+
+      input.addEventListener('input', function() {
+        var val = input.value.trim();
+        if (!val) {
+          dropdown.classList.add('hidden');
+          return;
+        }
+        if (cachedUsers && cachedUsers.length) {
+          showDropdown(filterUsers(val));
+        }
+        scheduleUserFetch(val);
+      });
+
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var matches = filterUsers(input.value.trim());
+          if (matches.length > 0) selectAssignee(matches[0]);
+        }
+        if (e.key === 'Backspace' && !input.value && selectedAssignees.length > 0) {
+          removeAssignee(selectedAssignees.length - 1);
+        }
+      });
+
+      input.addEventListener('blur', function() {
+        setTimeout(function() { dropdown.classList.add('hidden'); }, 300);
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!document.getElementById('assigneeChips').contains(e.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+
+      renderAssigneeTags();
+    }
+
+    function scheduleUserFetch(query) {
+      clearTimeout(userFetchTimer);
+      userFetchTimer = setTimeout(function() { fetchUserList(query); }, 220);
+    }
+
+    async function fetchUserList(query) {
+      try {
+        var q = (query || '').trim();
+        if (!q) {
+          cachedUsers = [];
+          cachedUserQuery = '';
+          showDropdown([]);
+          return;
+        }
+
+        // Try endpoints in order: assignable (best, filters by project) > username > query
+        var selectedProjects = getSelectedProjectKeys();
+        var projectKey = selectedProjects.length ? selectedProjects[0] : '';
+        var assignableEndpoint = projectKey
+          ? '/rest/api/2/user/assignable/search?project=' + encodeURIComponent(projectKey) + '&query=' + encodeURIComponent(q) + '&maxResults=50'
+          : '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50';
+        var endpoints = [
+          assignableEndpoint,
+          '/rest/api/2/user/search?username=' + encodeURIComponent(q) + '&maxResults=50',
+          '/rest/api/2/user/search?query=' + encodeURIComponent(q) + '&maxResults=50'
+        ];
+
+        var data = [];
+        for (var i = 0; i < endpoints.length; i++) {
+          try {
+            data = await jiraFetch(endpoints[i]);
+            if (Array.isArray(data)) break;
+          } catch (e) {
+            if (i === endpoints.length - 1) throw e;
+          }
+        }
+
+        cachedUsers = uniqueUsers((data || []).map(normalizeUser)).sort(function(a, b) {
+          return a.name.localeCompare(b.name);
+        });
+        cachedUserQuery = q;
+        showDropdown(filterUsers(document.getElementById('assigneeInput').value.trim()));
+      } catch(e) {
+        cachedUsers = [];
+        cachedUserQuery = '';
+        showDropdown([]);
+      }
+    }
+
+    function filterUsers(query) {
+      if (!cachedUsers || !query) return [];
+      var q = query.toLowerCase();
+      return cachedUsers.filter(function(u) {
+        return (u.name || '').toLowerCase().includes(q)
+          || (u.email || '').toLowerCase().includes(q)
+          || (u.username || '').toLowerCase().includes(q)
+          || (u.key || '').toLowerCase().includes(q)
+          || (u.id || '').toLowerCase().includes(q);
+      }).slice(0, 10);
+    }
+
+    function showDropdown(users) {
+      var dropdown = document.getElementById('assigneeDropdown');
+      if (users.length === 0) { dropdown.classList.add('hidden'); return; }
+      var html = users.map(function(u) {
+        return '<button type="button" data-user-id="' + escapeHtml(u.id) + '" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2">' +
+          '<div class="w-7 h-7 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">' + escapeHtml((u.name || '?').charAt(0).toUpperCase()) + '</div>' +
+          '<div><div class="font-medium">' + escapeHtml(u.name) + '</div><div class="text-xs text-slate-400">' + escapeHtml(u.email || u.username || u.id) + '</div></div>' +
+        '</button>';
+      }).join('');
+      dropdown.innerHTML = html;
+
+      var buttons = dropdown.querySelectorAll('button[data-user-id]');
+      buttons.forEach(function(btn) {
+        btn.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          var id = this.getAttribute('data-user-id');
+          var user = users.find(function(u) { return u.id === id; });
+          if (user) selectAssignee(user);
+        });
+      });
+
+      dropdown.classList.remove('hidden');
+    }
+
+    function renderAssigneeTags() {
+      var tags = document.getElementById('assigneeTags');
+      var clearBtn = document.getElementById('clearAssignee');
+      tags.innerHTML = selectedAssignees.map(function(a, idx) {
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">'
+          + escapeHtml(a.name)
+          + '<button type="button" onclick="removeAssignee(' + idx + ')" class="text-blue-500 hover:text-blue-700">×</button>'
+          + '</span>';
+      }).join('');
+      if (selectedAssignees.length > 0) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+
+    function selectAssignee(user, skipLoad) {
+      if (!user || !user.id) return;
+      var exists = selectedAssignees.some(function(a) { return a.id === user.id; });
+      if (exists) {
+        document.getElementById('assigneeInput').value = '';
+        document.getElementById('assigneeDropdown').classList.add('hidden');
+        return;
+      }
+
+      selectedAssignees.push({
+        id: user.id,
+        jqlId: user.jqlId || user.id,
+        accountId: user.accountId || '',
+        username: user.username || '',
+        key: user.key || '',
+        name: user.name || user.username || user.id
+      });
+      renderAssigneeTags();
+
+      document.getElementById('assigneeInput').value = '';
+      document.getElementById('assigneeDropdown').classList.add('hidden');
+      if (!skipLoad) debounceLoad();
+    }
+
+    function removeAssignee(index) {
+      if (index < 0 || index >= selectedAssignees.length) return;
+      selectedAssignees.splice(index, 1);
+      renderAssigneeTags();
+      loadData();
+    }
+
+    function clearAssignee() {
+      document.getElementById('assigneeInput').value = '';
+      selectedAssignees = [];
+      renderAssigneeTags();
+      loadData();
+    }
+
+    async function applyDefaultAssignee() {
+      if (selectedAssignees.length > 0) return;
+      var query = DEFAULT_ASSIGNEE_QUERY;
+      await fetchUserList(query);
+      if (!cachedUsers || cachedUsers.length === 0) return;
+
+      var q = query.toLowerCase();
+      var exact = cachedUsers.find(function(u) {
+        return (u.email || '').toLowerCase() === q
+          || (u.username || '').toLowerCase() === q
+          || (u.name || '').toLowerCase() === q;
+      });
+      var fallback = cachedUsers.find(function(u) {
+        return (u.email || '').toLowerCase().includes(q)
+          || (u.username || '').toLowerCase().includes(q)
+          || (u.name || '').toLowerCase().includes(q);
+      });
+      var user = exact || fallback;
+      if (user) selectAssignee(user, true);
+    }
+
+    async function initProjectFilter() {
+      var projectInput = document.getElementById('projectInput');
+      var projectDropdown = document.getElementById('projectDropdown');
+      if (!projectInput || !projectDropdown) return;
+
+      var projects = [];
+      try {
+        var data = await jiraFetch('/rest/api/2/project/search?maxResults=200');
+        projects = (data && data.values) ? data.values : [];
+      } catch (e) {
+        try {
+          var fallback = await jiraFetch('/rest/api/2/project');
+          projects = Array.isArray(fallback) ? fallback : [];
+        } catch (ignored) {
+          projects = [];
+        }
+      }
+
+      allProjects = projects
+        .filter(function(p) { return p && p.key; })
+        .sort(function(a, b) { return (a.key || '').localeCompare(b.key || ''); })
+        .map(function(p) {
+          return { key: p.key, name: p.name || '' };
+        });
+
+      selectedProjectKeys = [];
+      renderProjectSelection();
+
+      projectInput.addEventListener('focus', function() {
+        showProjectDropdown(filterProjects(projectInput.value.trim()));
+      });
+      projectInput.addEventListener('input', function() {
+        showProjectDropdown(filterProjects(projectInput.value.trim()));
+      });
+      projectInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var matches = filterProjects(projectInput.value.trim());
+          if (matches.length > 0) selectProject(matches[0].key);
+        }
+      });
+      projectInput.addEventListener('blur', function() {
+        setTimeout(function() { projectDropdown.classList.add('hidden'); }, 250);
+      });
+      document.addEventListener('click', function(e) {
+        if (!document.getElementById('projectChips').contains(e.target)) {
+          projectDropdown.classList.add('hidden');
+        }
+      });
+    }
+
+    function filterProjects(query) {
+      var q = (query || '').trim().toLowerCase();
+      if (!q) return allProjects.slice(0, 30);
+      return allProjects.filter(function(p) {
+        return (p.key || '').toLowerCase().includes(q)
+          || (p.name || '').toLowerCase().includes(q);
+      }).slice(0, 30);
+    }
+
+    function showProjectDropdown(projects) {
+      var dropdown = document.getElementById('projectDropdown');
+      if (!dropdown) return;
+      if (!projects || projects.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+      dropdown.innerHTML = projects.map(function(p) {
+        return '<button type="button" data-project-key="' + escapeHtml(p.key) + '" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0">' +
+          '<span class="font-semibold">' + escapeHtml(p.key) + '</span> - ' + escapeHtml(p.name || '') +
+          '</button>';
+      }).join('');
+      var buttons = dropdown.querySelectorAll('button[data-project-key]');
+      buttons.forEach(function(btn) {
+        btn.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          selectProject(this.getAttribute('data-project-key'));
+        });
+      });
+      dropdown.classList.remove('hidden');
+    }
+
+    function renderProjectSelection() {
+      var tags = document.getElementById('projectTags');
+      var clearBtn = document.getElementById('clearProject');
+      if (!tags || !clearBtn) return;
+      if (!selectedProjectKeys.length) {
+        tags.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Tất cả project</span>';
+        clearBtn.classList.add('hidden');
+        return;
+      }
+      tags.innerHTML = selectedProjectKeys.map(function(key, idx) {
+        var p = allProjects.find(function(x) { return x.key === key; });
+        var text = p ? (p.key + ' - ' + p.name) : key;
+        return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">'
+          + escapeHtml(text)
+          + '<button type="button" onclick="removeProject(' + idx + ')" class="text-blue-500 hover:text-blue-700">×</button>'
+          + '</span>';
+      }).join('');
+      clearBtn.classList.remove('hidden');
+    }
+
+    function selectProject(projectKey) {
+      if (!projectKey) return;
+      if (selectedProjectKeys.indexOf(projectKey) !== -1) {
+        var inputDup = document.getElementById('projectInput');
+        var dropdownDup = document.getElementById('projectDropdown');
+        if (inputDup) inputDup.value = '';
+        if (dropdownDup) dropdownDup.classList.add('hidden');
+        return;
+      }
+      selectedProjectKeys.push(projectKey);
+      renderProjectSelection();
+      var input = document.getElementById('projectInput');
+      var dropdown = document.getElementById('projectDropdown');
+      if (input) input.value = '';
+      if (dropdown) dropdown.classList.add('hidden');
+      onProjectChange();
+    }
+
+    function removeProject(index) {
+      if (index < 0 || index >= selectedProjectKeys.length) return;
+      selectedProjectKeys.splice(index, 1);
+      renderProjectSelection();
+      onProjectChange();
+    }
+
+    function clearProjectFilter() {
+      selectedProjectKeys = [];
+      renderProjectSelection();
+      var input = document.getElementById('projectInput');
+      var dropdown = document.getElementById('projectDropdown');
+      if (input) input.value = '';
+      if (dropdown) dropdown.classList.add('hidden');
+      onProjectChange();
+    }
+
+    function fmtDateForJira(dmy) {
+      // Convert dd/mm/yyyy -> yyyy-mm-dd
+      var parts = dmy.split('/');
+      if (parts.length === 3) return parts[2] + '-' + parts[1] + '-' + parts[0];
+      return dmy;
+    }
+
+    function getSelectedDateRange() {
+      var picker = document.getElementById('dateRange')._flatpickr;
+      if (picker && picker.selectedDates && picker.selectedDates.length === 2) {
+        var start = picker.selectedDates[0];
+        var end = picker.selectedDates[1];
+        var startDate = start.getFullYear() + '-' + ('0' + (start.getMonth() + 1)).slice(-2) + '-' + ('0' + start.getDate()).slice(-2);
+        var endDate = end.getFullYear() + '-' + ('0' + (end.getMonth() + 1)).slice(-2) + '-' + ('0' + end.getDate()).slice(-2);
+        return { startDate: startDate, endDate: endDate };
+      }
+
+      var val = document.getElementById('dateRange').value || '';
+      var parts = val.split(' to ');
+      if (parts.length < 2) parts = val.split(' đến ');
+      if (parts.length === 2) {
+        return { startDate: fmtDateForJira(parts[0].trim()), endDate: fmtDateForJira(parts[1].trim()) };
+      }
+
+      var now = new Date();
+      var first = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {
+        startDate: first.getFullYear() + '-' + ('0' + (first.getMonth() + 1)).slice(-2) + '-' + ('0' + first.getDate()).slice(-2),
+        endDate: now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2)
+      };
+    }
+
+    async function jiraFetch(url) {
+      var r = await fetch(url.startsWith('/') ? '/jira' + url : '/jira' + JIRA_BASE + url, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!r.ok) {
+        var text = await r.text();
+        throw new Error('Jira API error ' + r.status + ': ' + text.substring(0, 200));
+      }
+      return r.json();
+    }
+
+    async function fetchAllIssues(jql) {
+      var startAt = 0, total = Infinity, results = [];
+      while (startAt < total) {
+        var data = await jiraFetch('/rest/api/2/search?jql=' + encodeURIComponent(jql) + '&startAt=' + startAt + '&maxResults=100&fields=' + FIELDS);
+        total = data.total || 0;
+        results = results.concat(data.issues || []);
+        startAt += data.issues ? data.issues.length : 0;
+        if (!data.issues || data.issues.length === 0) break;
+      }
+      return results;
+    }
+
+    function toHours(seconds) {
+      if (!seconds && seconds !== 0) return 0;
+      return parseFloat((seconds / 3600).toFixed(1));
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+    }
+
+    function getStatusLabel(name) {
+      if (!name) return 'Unknown';
+      if (name === 'OPEN' || name === 'Open' || name === 'Mới') return 'Mới';
+      if (name === 'IN_PROGRESS' || name === 'In Progress' || name === 'Đang làm') return 'Đang làm';
+      if (name === 'RESOLVED' || name === 'Resolved' || name === 'Đã giải quyết') return 'Đã giải quyết';
+      if (name === 'CLOSED' || name === 'Closed' || name === 'Đã đóng') return 'Đã đóng';
+      return name;
+    }
+
+    function normalizeStatus(statusObj) {
+      var rawName = (statusObj && statusObj.name) || 'Unknown';
+      var categoryKey = (((statusObj || {}).statusCategory || {}).key || '').toLowerCase();
+      var categoryName = (((statusObj || {}).statusCategory || {}).name || '').toLowerCase();
+      var s = rawName.toLowerCase();
+
+      if (categoryKey === 'done' || categoryName === 'done' || categoryName === 'completed' || s === 'closed' || s === 'đã đóng') {
+        return { key: 'CLOSED', label: 'Đã đóng' };
+      }
+      if (s === 'resolved' || s === 'đã giải quyết') {
+        return { key: 'RESOLVED', label: 'Đã giải quyết' };
+      }
+      if (categoryKey === 'indeterminate' || categoryName === 'in progress' || s === 'in progress' || s === 'đang làm' || s === 'in_progress') {
+        return { key: 'IN_PROGRESS', label: 'Đang làm' };
+      }
+      if (categoryKey === 'new' || categoryName === 'to do' || s === 'open' || s === 'mới') {
+        return { key: 'OPEN', label: 'Mới' };
+      }
+
+      return { key: rawName, label: getStatusLabel(rawName) };
+    }
+
+    function getStatusColor(name) {
+      var map = {
+        'Mới': '#f59e0b', 'Open': '#f59e0b',
+        'Đang làm': '#3b82f6', 'In Progress': '#3b82f6',
+        'Đã giải quyết': '#10b981', 'Resolved': '#10b981',
+        'Đã đóng': '#6366f1', 'Closed': '#6366f1'
+      };
+      return map[name] || '#94a3b8';
+    }
+
+    function showToast(msg, isError) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.background = isError ? '#dc2626' : '#334155';
+      t.classList.remove('hidden');
+      t.style.display = 'flex';
+      setTimeout(function() { t.classList.add('hidden'); }, 3000);
+    }
+
+    function exportReportImage() {
+      if (!statusChart || !barChart || !ulnnChart) {
+        showToast('Chưa có dữ liệu biểu đồ để xuất', true);
+        return;
+      }
+
+      var width = 2040;
+      var height = 760;
+      var c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      var ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '700 40px Inter, sans-serif';
+      ctx.fillText('Jira Dashboard', 60, 72);
+      ctx.fillStyle = '#475569';
+      ctx.font = '400 22px Inter, sans-serif';
+      ctx.fillText('Xuat luc: ' + new Date().toLocaleString('vi-VN'), 60, 110);
+
+      var cardW = 620;
+      var cardH = 560;
+      var leftX = 40;
+      var midX = 710;
+      var rightX = 1380;
+      var y = 150;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(leftX, y, cardW, cardH);
+      ctx.fillRect(midX, y, cardW, cardH);
+      ctx.fillRect(rightX, y, cardW, cardH);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(leftX, y, cardW, cardH);
+      ctx.strokeRect(midX, y, cardW, cardH);
+      ctx.strokeRect(rightX, y, cardW, cardH);
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = '600 24px Inter, sans-serif';
+      ctx.fillText('Giờ theo trạng thái', leftX + 24, y + 38);
+      ctx.fillText('Estimated vs Thực tế', midX + 24, y + 38);
+      ctx.fillText('ULNN theo Assignee', rightX + 24, y + 38);
+
+      var img1 = new Image();
+      var img2 = new Image();
+      var img3 = new Image();
+      var done = 0;
+      var fail = false;
+
+      function drawAndDownload() {
+        if (fail || done < 3) return;
+        ctx.drawImage(img1, leftX + 20, y + 60, cardW - 40, cardH - 90);
+        ctx.drawImage(img2, midX + 20, y + 60, cardW - 40, cardH - 90);
+        ctx.drawImage(img3, rightX + 20, y + 60, cardW - 40, cardH - 90);
+        var a = document.createElement('a');
+        var ts = new Date().toISOString().replace(/[:.]/g, '-');
+        a.href = c.toDataURL('image/png');
+        a.download = 'jira-dashboard-report-' + ts + '.png';
+        a.click();
+        showToast('Đã xuất ảnh báo cáo', false);
+      }
+
+      function markDone() {
+        done++;
+        drawAndDownload();
+      }
+
+      img1.onload = markDone;
+      img2.onload = markDone;
+      img3.onload = markDone;
+      img1.onerror = function() { fail = true; showToast('Không thể xuất ảnh biểu đồ', true); };
+      img2.onerror = function() { fail = true; showToast('Không thể xuất ảnh biểu đồ', true); };
+      img3.onerror = function() { fail = true; showToast('Không thể xuất ảnh biểu đồ', true); };
+      img1.src = statusChart.toBase64Image();
+      img2.src = barChart.toBase64Image();
+      img3.src = ulnnChart.toBase64Image();
+    }
+
+    function buildAssigneeClauses() {
+      if (!selectedAssignees.length) return [''];
+
+      var quoteJqlValue = function(v) {
+        return '"' + String(v || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      };
+      var unique = function(arr) {
+        var seen = {};
+        return arr.filter(function(v) {
+          if (!v || seen[v]) return false;
+          seen[v] = true;
+          return true;
+        });
+      };
+
+      var ids = unique(selectedAssignees.map(function(a) { return a.accountId || ''; }));
+      var names = unique(selectedAssignees.map(function(a) { return a.username || ''; }));
+      var keys = unique(selectedAssignees.map(function(a) { return a.key || ''; }));
+
+      var clauses = [];
+      if (ids.length) clauses.push(' AND assignee in (' + ids.map(quoteJqlValue).join(',') + ')');
+      if (names.length) clauses.push(' AND assignee in (' + names.map(quoteJqlValue).join(',') + ')');
+      if (keys.length) clauses.push(' AND assignee in (' + keys.map(quoteJqlValue).join(',') + ')');
+      clauses.push('');
+
+      return unique(clauses);
+    }
+
+    function buildProjectJqlPrefix() {
+      var keys = getSelectedProjectKeys();
+      if (!keys.length) return '';
+      var quoted = keys.map(function(k) {
+        return '"' + String(k || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      }).join(',');
+      return 'project in (' + quoted + ') AND ';
+    }
+
+    function getIssuePagination(total) {
+      var pageSize = Math.max(1, issuePageSize || 20);
+      var totalPages = Math.max(1, Math.ceil(total / pageSize));
+      if (currentIssuePage > totalPages) currentIssuePage = totalPages;
+      if (currentIssuePage < 1) currentIssuePage = 1;
+      var start = total === 0 ? 0 : ((currentIssuePage - 1) * pageSize + 1);
+      var end = Math.min(total, currentIssuePage * pageSize);
+      return { pageSize: pageSize, totalPages: totalPages, start: start, end: end };
+    }
+
+    function goToIssuePage(page) {
+      currentIssuePage = page;
+      renderDashboard();
+    }
+
+    function changeIssuePageSize() {
+      var el = document.getElementById('issuePageSize');
+      issuePageSize = parseInt(el && el.value ? el.value : '20', 10) || 20;
+      currentIssuePage = 1;
+      renderDashboard();
+    }
+
+    function renderIssuePagination(total) {
+      var p = getIssuePagination(total);
+      var prevBtn = document.getElementById('issuePrevPage');
+      var nextBtn = document.getElementById('issueNextPage');
+      var pageText = document.getElementById('issuePageText');
+      var infoText = document.getElementById('issuePaginationInfo');
+      if (prevBtn) prevBtn.disabled = currentIssuePage <= 1 || total === 0;
+      if (nextBtn) nextBtn.disabled = currentIssuePage >= p.totalPages || total === 0;
+      if (pageText) pageText.textContent = currentIssuePage + ' / ' + p.totalPages;
+      if (infoText) infoText.textContent = p.start + '-' + p.end + ' / ' + total;
+      var sizeEl = document.getElementById('issuePageSize');
+      if (sizeEl) sizeEl.value = String(p.pageSize);
+      return p;
+    }
+
+    async function loadData() {
+      var loading = document.getElementById('loadingState');
+      var errorEl = document.getElementById('errorState');
+      var content = document.getElementById('dashboardContent');
+
+      loading.classList.remove('hidden');
+      errorEl.classList.add('hidden');
+      content.classList.add('hidden');
+
+      try {
+        var range = getSelectedDateRange();
+        var statusVal = document.getElementById('statusFilter').value;
+        var projectJql = buildProjectJqlPrefix();
+        var assigneeClauses = buildAssigneeClauses();
+        var lastErr = null;
+        var loaded = false;
+
+        for (var i = 0; i < assigneeClauses.length; i++) {
+          var jql = projectJql + 'worklogDate >= "' + range.startDate + '" AND worklogDate <= "' + range.endDate + '"' + assigneeClauses[i];
+          try {
+            var issues = await fetchAllIssues(jql);
+            allIssues = issues;
+            loaded = true;
+            if (issues.length > 0 || i === assigneeClauses.length - 1) break;
+          } catch (e) {
+            lastErr = e;
+            if (i === assigneeClauses.length - 1) throw e;
+          }
+        }
+        if (!loaded && lastErr) throw lastErr;
+
+        if (statusVal !== 'all') {
+          allIssues = allIssues.filter(function(i) {
+            return normalizeStatus(i.fields.status).key === statusVal;
+          });
+        }
+
+        currentIssuePage = 1;
+
+        renderDashboard();
+        var rt = document.getElementById('refreshTime');
+        rt.textContent = 'Cập nhập: ' + new Date().toLocaleTimeString('vi-VN');
+        rt.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        loading.classList.add('hidden');
+        errorEl.classList.remove('hidden');
+        document.getElementById('errorMessage').textContent = err.message || 'Lỗi không xác định';
+      }
+    }
+
+    function renderDashboard() {
+      var loading = document.getElementById('loadingState');
+      var content = document.getElementById('dashboardContent');
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+
+      // ---- Stats ----
+      var totalIssues = allIssues.length;
+      var totalEst = 0, totalLog = 0, closedEst = 0, closedLog = 0, resolvedEst = 0, resolvedLog = 0;
+
+      allIssues.forEach(function(i) {
+        var tt = i.fields.timetracking || {};
+        var est = tt.originalEstimateSeconds || 0;
+        var log = tt.timeSpentSeconds || 0;
+        totalEst += est;
+        totalLog += log;
+        var s = normalizeStatus(i.fields.status);
+        if (s.key === 'CLOSED') {
+          closedEst += est; closedLog += log;
+        }
+        if (s.key === 'RESOLVED') {
+          resolvedEst += est; resolvedLog += log;
+        }
+      });
+
+      var statCards = [
+        { label: 'Tổng Issue', value: totalIssues, sub: toHours(totalEst) + 'h estimate', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+        { label: 'Tổng Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalLog) + 'h đã log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+        { label: 'Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
+        { label: 'Giờ Resolved', value: toHours(resolvedEst) + 'h est', sub: toHours(resolvedLog) + 'h log', color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
+      ];
+
+      var colors = { blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500' };
+      var textColors = { blue: 'text-blue-600', violet: 'text-violet-600', emerald: 'text-emerald-600', amber: 'text-amber-600' };
+      var bgColors = { blue: 'bg-blue-50', violet: 'bg-violet-50', emerald: 'bg-emerald-50', amber: 'bg-amber-50' };
+
+      var cardsHTML = statCards.map(function(c) {
+        return '<div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-200 p-5">' +
+          '<div class="flex items-start justify-between mb-3">' +
+            '<div class="' + bgColors[c.color] + ' ' + colors[c.color] + ' w-10 h-10 rounded-xl flex items-center justify-center">' +
+              '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + c.icon + '"/></svg>' +
+            '</div>' +
+          '</div>' +
+          '<div class="' + textColors[c.color] + ' text-2xl font-extrabold">' + c.value + '</div>' +
+          '<div class="text-slate-500 text-xs mt-1 font-medium">' + c.label + '</div>' +
+          '<div class="text-slate-400 text-xs mt-0.5">' + c.sub + '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('statCards').innerHTML = cardsHTML;
+
+      // ---- Status breakdown for chart ----
+      var statusMap = {};
+      allIssues.forEach(function(i) {
+        var normalized = normalizeStatus(i.fields.status);
+        var sname = normalized.label || 'Unknown';
+        if (!statusMap[sname]) statusMap[sname] = { est: 0, log: 0, count: 0 };
+        var tt = i.fields.timetracking || {};
+        statusMap[sname].est += tt.originalEstimateSeconds || 0;
+        statusMap[sname].log += tt.timeSpentSeconds || 0;
+        statusMap[sname].count++;
+      });
+
+      var statusLabels = Object.keys(statusMap);
+      var statusEstData = statusLabels.map(function(k) { return toHours(statusMap[k].est); });
+      var statusLogData = statusLabels.map(function(k) { return toHours(statusMap[k].log); });
+      var statusBgColors = statusLabels.map(function(k) { return getStatusColor(k); });
+
+      if (statusChart) statusChart.destroy();
+      var ctx1 = document.getElementById('statusChart').getContext('2d');
+      statusChart = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            data: statusLogData,
+            backgroundColor: statusBgColors,
+            borderWidth: 0,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  var label = ctx.label || '';
+                  var est = toHours(statusMap[label].est);
+                  var log = ctx.parsed || 0;
+                  return label + ': ' + log + 'h logged / ' + est + 'h est';
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // ---- Bar chart ----
+      if (barChart) barChart.destroy();
+      var ctx2 = document.getElementById('barChart').getContext('2d');
+      barChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: statusLabels,
+          datasets: [
+            {
+              label: 'Estimate (h)',
+              data: statusEstData,
+              backgroundColor: 'rgba(99,102,241,0.8)',
+              borderRadius: 8,
+              borderSkipped: false
+            },
+            {
+              label: 'Thực tế (h)',
+              data: statusLogData,
+              backgroundColor: 'rgba(16,185,129,0.8)',
+              borderRadius: 8,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', align: 'end', labels: { boxWidth: 12, padding: 16, font: { size: 12 } } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, callback: function(v) { return v + 'h'; } } }
+          }
+        }
+      });
+
+      // ---- ULNN by assignee ----
+      var assigneeMap = {};
+      allIssues.forEach(function(i) {
+        var aobj = i.fields.assignee || {};
+        var aname = aobj.displayName || aobj.name || 'Unassigned';
+        if (!assigneeMap[aname]) assigneeMap[aname] = { est: 0, log: 0 };
+        var tt = i.fields.timetracking || {};
+        assigneeMap[aname].est += tt.originalEstimateSeconds || 0;
+        assigneeMap[aname].log += tt.timeSpentSeconds || 0;
+      });
+
+      var ulnnLabels = Object.keys(assigneeMap);
+      var ulnnData = ulnnLabels.map(function(k) {
+        var est = assigneeMap[k].est || 0;
+        var log = assigneeMap[k].log || 0;
+        return est > 0 ? +(log / est).toFixed(3) : 0;
+      });
+
+      if (ulnnChart) ulnnChart.destroy();
+      var ctx3 = document.getElementById('ulnnChart').getContext('2d');
+      ulnnChart = new Chart(ctx3, {
+        type: 'bar',
+        plugins: [{
+          id: 'ulnnValueLabels',
+          afterDatasetsDraw: function(chart) {
+            var ctx = chart.ctx;
+            var meta = chart.getDatasetMeta(0);
+            var data = chart.data.datasets[0].data || [];
+            ctx.save();
+            ctx.fillStyle = '#92400e';
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            meta.data.forEach(function(bar, i) {
+              var v = data[i];
+              if (v === null || typeof v === 'undefined') return;
+              ctx.fillText(Number(v).toFixed(3), bar.x, bar.y - 4);
+            });
+            ctx.restore();
+          }
+        }],
+        data: {
+          labels: ulnnLabels,
+          datasets: [{
+            label: 'ULNN',
+            data: ulnnData,
+            backgroundColor: 'rgba(245,158,11,0.82)',
+            borderRadius: 8,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  var key = ctx.label || '';
+                  var estH = toHours(assigneeMap[key].est || 0);
+                  var logH = toHours(assigneeMap[key].log || 0);
+                  var days = +(logH / 7).toFixed(2);
+                  return 'ULNN: ' + ctx.parsed.y + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Ngay cong: ' + days;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: {
+              beginAtZero: true,
+              grid: { color: '#f1f5f9' },
+              ticks: { font: { size: 11 }, callback: function(v) { return Number(v).toFixed(2); } }
+            }
+          }
+        }
+      });
+
+      // ---- Table ----
+      var pagination = renderIssuePagination(totalIssues);
+      var pagedIssues = allIssues.slice(pagination.start > 0 ? pagination.start - 1 : 0, pagination.end);
+      var tableRows = pagedIssues.map(function(i) {
+        var tt = i.fields.timetracking || {};
+        var normalized = normalizeStatus(i.fields.status);
+        var sname = normalized.label || 'Unknown';
+        var sclass = normalized.key === 'CLOSED' ? 'status-CLOSED'
+          : normalized.key === 'RESOLVED' ? 'status-RESOLVED'
+          : normalized.key === 'IN_PROGRESS' ? 'status-IN_PROGRESS'
+          : 'status-OPEN';
+        var assignee = (i.fields.assignee || {}).displayName || (i.fields.assignee || {}).name || '-';
+        return '<tr class="hover:bg-slate-50 transition">' +
+          '<td class="px-6 py-3"><a href="' + JIRA_BASE + '/browse/' + i.key + '" target="_blank" class="text-blue-600 hover:underline font-semibold text-xs">' + i.key + '</a></td>' +
+          '<td class="px-6 py-3 max-w-xs truncate text-slate-700" title="' + (i.fields.summary || '') + '">' + (i.fields.summary || '-') + '</td>' +
+          '<td class="px-6 py-3 text-slate-600 text-xs font-medium">' + ((i.key || '').split('-')[0] || '-') + '</td>' +
+          '<td class="px-6 py-3 text-slate-600 text-xs">' + assignee + '</td>' +
+          '<td class="px-4 py-3 text-center"><span class="tag-chip ' + sclass + '">' + sname + '</span></td>' +
+          '<td class="px-4 py-3 text-center font-semibold text-slate-700">' + (tt.originalEstimateSeconds ? toHours(tt.originalEstimateSeconds) + 'h' : '-') + '</td>' +
+          '<td class="px-4 py-3 text-center font-semibold ' + (tt.timeSpentSeconds ? 'text-emerald-600' : 'text-slate-400') + '">' + (tt.timeSpentSeconds ? toHours(tt.timeSpentSeconds) + 'h' : '-') + '</td>' +
+          '<td class="px-4 py-3 text-center text-slate-500 text-xs">' + fmtDate(i.fields.created) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      document.getElementById('issueCount').textContent = totalIssues + ' issues';
+      document.getElementById('issueTableBody').innerHTML = tableRows || '<tr><td colspan="8" class="text-center py-8 text-slate-400">Khong co issue nao</td></tr>';
+      showToast('Đã tải ' + allIssues.length + ' issues', false);
+    }
+  </script>
+</body>
+</html>
