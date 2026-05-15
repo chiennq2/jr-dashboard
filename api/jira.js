@@ -1,9 +1,28 @@
 const https = require('https');
 
-function buildTargetUrl(base, pathSegments, query) {
+function normalizePath(pathValue) {
+  return String(pathValue || '')
+    .replace(/^\/+/, '')
+    .replace(/\/+/g, '/');
+}
+
+function joinUrl(base, path, query) {
   const cleanBase = String(base || '').replace(/\/+$/, '');
-  const safePath = (pathSegments || []).map(encodeURIComponent).join('/');
-  return `${cleanBase}/${safePath}${query ? `?${query}` : ''}`;
+  const cleanPath = normalizePath(path);
+  return `${cleanBase}/${cleanPath}${query ? `?${query}` : ''}`;
+}
+
+function avoidDuplicateRestPrefix(base, path) {
+  const baseHasRest = /\/rest\/api\/2\/?$/i.test(base);
+  const normalizedPath = normalizePath(path);
+  if (!baseHasRest) return normalizedPath;
+  if (normalizedPath.toLowerCase().startsWith('rest/api/2/')) {
+    return normalizedPath.slice('rest/api/2/'.length);
+  }
+  if (normalizedPath.toLowerCase() === 'rest/api/2') {
+    return '';
+  }
+  return normalizedPath;
 }
 
 module.exports = async (req, res) => {
@@ -22,15 +41,17 @@ module.exports = async (req, res) => {
 
   const jiraBase = process.env.JIRA_BASE || '';
   const jiraToken = process.env.JIRA_TOKEN || '';
+  const allowSelfSigned = String(process.env.JIRA_ALLOW_SELF_SIGNED || '').toLowerCase() === 'true';
+
   if (!jiraBase || !jiraToken) {
     res.status(500).json({ error: 'Missing JIRA_BASE or JIRA_TOKEN environment variables' });
     return;
   }
 
-  const pathSegments = Array.isArray(req.query.path) ? req.query.path : [req.query.path].filter(Boolean);
-  const query = new URLSearchParams({ ...req.query });
-  query.delete('path');
-  const targetUrl = buildTargetUrl(jiraBase, pathSegments, query.toString());
+  const { path, ...restQuery } = req.query || {};
+  const rawPath = Array.isArray(path) ? path.join('/') : path;
+  const safePath = avoidDuplicateRestPrefix(jiraBase, rawPath);
+  const targetUrl = joinUrl(jiraBase, safePath, new URLSearchParams(restQuery).toString());
 
   const upstream = https.request(
     targetUrl,
@@ -39,7 +60,8 @@ module.exports = async (req, res) => {
       headers: {
         Authorization: `Bearer ${jiraToken}`,
         'Content-Type': 'application/json'
-      }
+      },
+      rejectUnauthorized: !allowSelfSigned
     },
     (upstreamRes) => {
       let body = '';
@@ -55,7 +77,7 @@ module.exports = async (req, res) => {
   );
 
   upstream.on('error', (err) => {
-    res.status(502).json({ error: `Proxy error: ${err.message}` });
+    res.status(502).json({ error: `Proxy error: ${err.message}`, targetUrl });
   });
 
   upstream.end();
