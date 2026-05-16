@@ -312,7 +312,8 @@ test('POST /api/odoo/verify-otp exchanges the pending token for a final session 
   ], async () => {
     await verifyOtpHandler(
       createMockReq({
-        otp: '123456'
+        otp: '123456',
+        account: 'user@example.com'
       }, `jr_odoo_pending=${encodeURIComponent(pendingToken)}`),
       res
     );
@@ -324,6 +325,7 @@ test('POST /api/odoo/verify-otp exchanges the pending token for a final session 
   assert.equal(payload.authenticated, true);
   assert.equal(payload.token, 'final-business-token');
   assert.ok(String(res.headers['Set-Cookie']).includes('jr_odoo_session='));
+  assert.ok(String(res.headers['Set-Cookie']).includes('jr_session='));
   assert.ok(String(res.headers['Set-Cookie']).includes('jr_odoo_pending='));
   assert.ok(String(res.headers['Set-Cookie']).includes('Max-Age=0'));
 });
@@ -345,7 +347,8 @@ test('POST /api/odoo/verify-otp accepts a pending token from the request body wh
     await verifyOtpHandler(
       createMockReq({
         otp: '123456',
-        pending_token: 'temporary-business-token'
+        pending_token: 'temporary-business-token',
+        account: 'user@example.com'
       }),
       res
     );
@@ -356,6 +359,7 @@ test('POST /api/odoo/verify-otp accepts a pending token from the request body wh
   assert.equal(payload.ok, true);
   assert.equal(payload.authenticated, true);
   assert.equal(payload.token, 'final-business-token');
+  assert.ok(String(res.headers['Set-Cookie']).includes('jr_session='));
 });
 
 test('POST /api/odoo/login rejects invalid credentials and clears the Odoo cookie', async () => {
