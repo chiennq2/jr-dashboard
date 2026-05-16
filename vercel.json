@@ -13,6 +13,14 @@
       "destination": "/login.html"
     },
     {
+      "source": "/odoo",
+      "destination": "/odoo-auth.html"
+    },
+    {
+      "source": "/odoo-login",
+      "destination": "/odoo-auth.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/app"
     }

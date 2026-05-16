@@ -62,6 +62,36 @@
               </div>
               <button onclick="loadUlnnData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium">Áp dụng</button>
             </div>
+            <div id="ulnnOtSection" class="hidden px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-white">
+              <div class="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <h4 class="font-semibold text-slate-800 text-sm">OT theo tháng</h4>
+                  <p class="text-xs text-slate-500 mt-1">Nhập OT cho từng user ở 3 tháng gần nhất. Dữ liệu sẽ được lưu cục bộ trên trình duyệt và dùng lại khi mở modal sau.</p>
+                </div>
+                <div class="text-xs font-medium text-slate-400">Đơn vị: giờ</div>
+              </div>
+              <div class="overflow-x-auto">
+                <table id="ulnnOtTable" class="min-w-full border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  <thead class="bg-slate-50">
+                    <tr class="text-xs uppercase tracking-wider text-slate-500">
+                      <th class="px-3 py-3 text-left font-semibold">User</th>
+                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN">n</th>
+                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN1">n-1</th>
+                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN2">n-2</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ulnnOtTableBody" class="divide-y divide-slate-100"></tbody>
+                  <tfoot class="bg-slate-50 border-t border-slate-200">
+                    <tr id="ulnnOtSummary" class="text-sm font-semibold text-slate-700">
+                      <td class="px-3 py-3">Tổng OT</td>
+                      <td class="px-3 py-3" id="ulnnOtTotalN">0</td>
+                      <td class="px-3 py-3" id="ulnnOtTotalN1">0</td>
+                      <td class="px-3 py-3" id="ulnnOtTotalN2">0</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
             <div class="p-6">
               <div id="ulnnEmpty" class="hidden text-center text-slate-400 py-16 text-sm font-medium">Không có dữ liệu ULNN</div>
               <div id="ulnnLoading" class="hidden flex items-center justify-center py-12">
@@ -220,7 +250,7 @@
     <div class="absolute inset-0 bg-slate-900/50" onclick="closeDailyLogworkModal()"></div>
     <div class="relative mx-auto mt-10 w-[92vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-        <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">Logwork theo ngày (theo assignee)</h3>
+        <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">Logwork theo ngày</h3>
         <button onclick="closeDailyLogworkModal()" class="text-slate-500 hover:text-slate-700 text-sm font-semibold">Đóng</button>
       </div>
       <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-4 items-end">
@@ -279,11 +309,18 @@
     let dailyCachedUsers = null;
     let dailyUserFetchTimer = null;
     // ULNN (12 months) state
+    const ULNN_OT_STORAGE_KEY = 'jira_dashboard_ulnn_ot_v1';
+    const ULNN_OT_MONTH_KEYS = ['n', 'n-1', 'n-2'];
     let ulnnSelectedUsers = [];
     let ulnnCachedUsers = null;
     let ulnnUserFetchTimer = null;
+    let ulnnModalBaseState = null;
+    let ulnnOtState = null;
     let dashboardUlnnChart = null;
     let modalUlnnChart = null;
+    let odooSessionProfile = null;
+    let odooOverTimeHours = 0;
+    let odooHydrationPromise = null;
     const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -296,6 +333,7 @@
         try { initUlnnUserAutocomplete(); } catch(e) { console.error('ulnn user init error', e); }
         try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
         try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
+        try { hydrateOdooSession(); } catch(e) { console.error('odoo session init error', e); }
         try { await loadData(); } catch(e) { console.error('loadData error', e); }
       }
       setTimeout(safeInit, 300);
@@ -904,14 +942,17 @@
 
       function selectUlnnUser(user) {
         if (!user || !user.id) return; var exists = ulnnSelectedUsers.some(function(a){ return a.id === user.id; }); if (exists) { document.getElementById('ulnnUserInput').value = ''; document.getElementById('ulnnUserDropdown').classList.add('hidden'); return; }
-        ulnnSelectedUsers.push({ id: user.id, accountId: user.accountId||'', username: user.username||'', key: user.key||'', name: user.name||user.username||user.id });
-        renderUlnnUserTags(); document.getElementById('ulnnUserInput').value = ''; document.getElementById('ulnnUserDropdown').classList.add('hidden');
+        ulnnSelectedUsers.push({ id: user.id, storageKey: getUlnnUserStorageKey(user), accountId: user.accountId||'', username: user.username||'', key: user.key||'', name: user.name||user.username||user.id });
+        renderUlnnUserTags();
+        renderUlnnOtSection();
+        if (ulnnModalBaseState) invalidateUlnnModalChart();
+        document.getElementById('ulnnUserInput').value = ''; document.getElementById('ulnnUserDropdown').classList.add('hidden');
       }
 
-      function removeUlnnUser(index) { if (index<0||index>=ulnnSelectedUsers.length) return; ulnnSelectedUsers.splice(index,1); renderUlnnUserTags(); }
-      function clearUlnnUsers() { ulnnSelectedUsers = []; document.getElementById('ulnnUserInput').value=''; renderUlnnUserTags(); }
+      function removeUlnnUser(index) { if (index<0||index>=ulnnSelectedUsers.length) return; ulnnSelectedUsers.splice(index,1); renderUlnnUserTags(); renderUlnnOtSection(); if (ulnnModalBaseState) invalidateUlnnModalChart(); }
+      function clearUlnnUsers() { ulnnSelectedUsers = []; document.getElementById('ulnnUserInput').value=''; renderUlnnUserTags(); renderUlnnOtSection(); if (ulnnModalBaseState) invalidateUlnnModalChart(); }
 
-      function openUlnnModal() { var modal = document.getElementById('ulnnModal'); if (!modal) return; modal.classList.remove('hidden'); renderUlnnUserTags(); var inp = document.getElementById('ulnnUserInput'); if (inp) inp.value=''; /* do not auto-load: wait for user to select accounts and press Áp dụng */ }
+      function openUlnnModal() { var modal = document.getElementById('ulnnModal'); if (!modal) return; modal.classList.remove('hidden'); renderUlnnUserTags(); renderUlnnOtSection(); var inp = document.getElementById('ulnnUserInput'); if (inp) inp.value=''; /* do not auto-load: wait for user to select accounts and press Áp dụng */ }
       function closeUlnnModal() { var modal = document.getElementById('ulnnModal'); if (!modal) return; modal.classList.add('hidden'); }
 
       // Full pagination search with custom fields — unlike fetchAllIssuesWithCap, this never swallows errors silently
@@ -939,7 +980,7 @@
           var canvasWrap = document.getElementById('ulnnCanvasWrap'); if (canvasWrap) canvasWrap.classList.add('hidden');
           if (!ulnnSelectedUsers || ulnnSelectedUsers.length === 0) {
             showToast('Vui lòng chọn ít nhất 1 tài khoản rồi nhấn Áp dụng', true);
-            renderUlnnChart([], []);
+            renderUlnnChart(null);
             cleanupApplyBtn();
             if (loadingEl) { loadingEl.classList.add('hidden'); }
             return;
@@ -1140,52 +1181,45 @@
 
           setProgress('Đang vẽ biểu đồ...');
 
-          // Build chart data: labels = user names, datasets = 3 months
+          // Build and store base state; actual dataset values are derived from the current OT table
           var userLabels = ulnnSelectedUsers.map(function(u){
             return u.name || u.accountId || u.key || u.id;
           });
           var userIds = ulnnSelectedUsers.map(function(u){
-            return u.accountId || u.key || u.id || u.name;
+            return getUlnnUserStorageKey(u);
           });
 
-          var monthColors = [
-            { bg: 'rgba(245,158,11,0.82)', border: '#f59e0b' },   // current month - amber
-            { bg: 'rgba(59,130,246,0.75)', border: '#3b82f6' },    // previous month - blue
-            { bg: 'rgba(16,185,129,0.70)', border: '#10b981' }     // 2 months ago - green
-          ];
+          ulnnModalBaseState = {
+            labels: userLabels,
+            userIds: userIds,
+            map: map,
+            monthRanges: monthRanges,
+            selectedUsers: ulnnSelectedUsers.map(function(u) {
+              return {
+                id: u.id,
+                storageKey: getUlnnUserStorageKey(u),
+                accountId: u.accountId || '',
+                username: u.username || '',
+                key: u.key || '',
+                name: u.name || u.username || u.id
+              };
+            })
+          };
 
-          var datasets = monthRanges.map(function(mr, mIdx){
-            return {
-              label: 'Tháng ' + mr.label,
-              data: userIds.map(function(uid){
-                var u = map[uid];
-                if (!u) return 0;
-                var monthObj = u.months[mIdx];
-                var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
-                var estH = (monthObj.estClosed || 0) / 3600;
-                // ULNN = số ngày có logwork × 7h / tổng estimated của task đã đóng
-                return estH > 0 ? Number(((worklogDays * 7) / estH).toFixed(3)) : 0;
-              }),
-              backgroundColor: monthColors[mIdx].bg,
-              borderColor: monthColors[mIdx].border,
-              borderWidth: 1,
-              borderRadius: 6,
-              borderSkipped: false
-            };
-          });
-
+          renderUlnnOtSection();
+          var datasets = buildUlnnModalDatasets(ulnnModalBaseState);
           var hasAny = datasets.some(function(ds){ return ds.data && ds.data.some(function(v){ return v && v > 0; }); });
           if (!hasAny) {
             showToast('Không có dữ liệu ULNN cho tài khoản/khung thời gian đã chọn', true);
-            renderUlnnChart([], []);
+            renderUlnnChart(null);
             return;
           }
 
-          renderUlnnChart(userLabels, datasets, map, userIds, monthRanges);
+          renderUlnnChart(ulnnModalBaseState);
         } catch (e) {
           console.error('loadUlnnData error:', e);
           showToast('Không tải được dữ liệu ULNN: ' + (e.message || '').substring(0, 80), true);
-          renderUlnnChart([], []);
+          renderUlnnChart(null);
         } finally {
           cleanupApplyBtn();
           if (loadingEl) loadingEl.classList.add('hidden');
@@ -1202,15 +1236,47 @@
         try { if (!hex) return 'rgba(59,130,246,'+a+')'; var h = hex.replace('#',''); if (h.length===3) h = h.split('').map(function(c){ return c+c; }).join(''); var r = parseInt(h.slice(0,2),16); var g = parseInt(h.slice(2,4),16); var b = parseInt(h.slice(4,6),16); return 'rgba('+r+','+g+','+b+','+a+')'; } catch(e) { return 'rgba(59,130,246,'+a+')'; }
       }
 
-      function renderUlnnChart(labels, datasets, mapData, userIds, monthRanges) {
+      function buildUlnnModalDatasets(baseState) {
+        if (!baseState || !baseState.map || !baseState.userIds || !baseState.monthRanges) return [];
+        var monthColors = [
+          { bg: 'rgba(245,158,11,0.82)', border: '#f59e0b' },   // current month - amber
+          { bg: 'rgba(59,130,246,0.75)', border: '#3b82f6' },    // previous month - blue
+          { bg: 'rgba(16,185,129,0.70)', border: '#10b981' }     // 2 months ago - green
+        ];
+
+        return baseState.monthRanges.map(function(mr, mIdx) {
+          var monthKey = getUlnnMonthKey(mIdx);
+          return {
+            label: 'Tháng ' + mr.label,
+            data: baseState.userIds.map(function(uid) {
+              var u = baseState.map[uid];
+              if (!u) return 0;
+              var monthObj = u.months[mIdx];
+              var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
+              var estH = (monthObj.estClosed || 0) / 3600;
+              var otHours = getUlnnOtValue(uid, monthKey);
+              return estH > 0 ? Number(((worklogDays * 7 + otHours) / estH).toFixed(3)) : 0;
+            }),
+            backgroundColor: monthColors[mIdx].bg,
+            borderColor: monthColors[mIdx].border,
+            borderWidth: 1,
+            borderRadius: 6,
+            borderSkipped: false
+          };
+        });
+      }
+
+      function renderUlnnChart(baseState) {
         var emptyEl = document.getElementById('ulnnEmpty'); var wrap = document.getElementById('ulnnCanvasWrap');
-        if (!datasets || datasets.length===0) { if (modalUlnnChart) { modalUlnnChart.destroy(); modalUlnnChart = null; } emptyEl.classList.remove('hidden'); wrap.classList.add('hidden'); return; }
+        var labels = baseState && baseState.labels ? baseState.labels : [];
+        var datasets = buildUlnnModalDatasets(baseState);
+        if (!baseState || !datasets || datasets.length===0 || !labels.length) { if (modalUlnnChart) { modalUlnnChart.destroy(); modalUlnnChart = null; } emptyEl.classList.remove('hidden'); wrap.classList.add('hidden'); return; }
         emptyEl.classList.add('hidden'); wrap.classList.remove('hidden'); if (modalUlnnChart) modalUlnnChart.destroy();
         var ctx = document.getElementById('ulnnChartModal').getContext('2d');
         // Store references for tooltip
-        var _mapData = mapData || {};
-        var _userIds = userIds || [];
-        var _monthRanges = monthRanges || [];
+        var _mapData = baseState.map || {};
+        var _userIds = baseState.userIds || [];
+        var _monthRanges = baseState.monthRanges || [];
         modalUlnnChart = new Chart(ctx, {
           type: 'bar',
           plugins: [{
@@ -1251,10 +1317,15 @@
                     var estH = monthObj ? ((monthObj.estClosed || 0) / 3600).toFixed(1) : '0';
                     var mr = _monthRanges[dsIdx];
                     var range = mr ? (mr.startDate + ' → ' + mr.endDate) : '';
-                    return ctx.dataset.label + ': ' + Number(ctx.parsed.y||0).toFixed(3)
-                      + ' | Ngày log: ' + worklogDays
-                      + ' | Est Closed: ' + estH + 'h'
-                      + (range ? ' | ' + range : '');
+                    var otHours = getUlnnOtValue(uid, getUlnnMonthKey(dsIdx));
+                    var logWorkHours = worklogDays * 7;
+                    return [
+                      'ULNN: ' + Number(ctx.parsed.y || 0).toFixed(3),
+                      'Est: ' + estH + ' h',
+                      'LogWork: ' + Number(logWorkHours || 0).toFixed(1) + ' h',
+                      'OT (' + getUlnnMonthKey(dsIdx) + '): ' + formatOdooHours(otHours) + ' h',
+                      'Σ Ngày Công: ' + worklogDays + ' d'
+                    ];
                   }
                 }
               }
@@ -1659,6 +1730,176 @@
       return out;
     }
 
+    function escapeJsString(str) {
+      return String(str || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, ' ');
+    }
+
+    function getUlnnUserStorageKey(user) {
+      if (!user) return '';
+      return String(user.storageKey || user.accountId || user.key || user.id || user.username || user.name || '').trim();
+    }
+
+    function getUlnnMonthKey(index) {
+      return ULNN_OT_MONTH_KEYS[index] || ('n-' + index);
+    }
+
+    function normalizeUlnnOtValue(value) {
+      var num = Number(value);
+      if (!Number.isFinite(num) || num < 0) return 0;
+      return Number(num.toFixed(3));
+    }
+
+    function loadUlnnOtState() {
+      if (ulnnOtState && typeof ulnnOtState === 'object') return ulnnOtState;
+      try {
+        var raw = window.localStorage.getItem(ULNN_OT_STORAGE_KEY);
+        var parsed = raw ? JSON.parse(raw) : {};
+        ulnnOtState = parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (error) {
+        ulnnOtState = {};
+      }
+      return ulnnOtState;
+    }
+
+    function saveUlnnOtState(nextState) {
+      ulnnOtState = nextState && typeof nextState === 'object' ? nextState : {};
+      try {
+        window.localStorage.setItem(ULNN_OT_STORAGE_KEY, JSON.stringify(ulnnOtState));
+      } catch (error) {
+        // Ignore storage failures in private browsing or restricted contexts.
+      }
+      return ulnnOtState;
+    }
+
+    function ensureUlnnOtEntry(userKey) {
+      var state = loadUlnnOtState();
+      if (!userKey) return { n: 0, 'n-1': 0, 'n-2': 0 };
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: 0, 'n-1': 0, 'n-2': 0 };
+      }
+      ULNN_OT_MONTH_KEYS.forEach(function(monthKey) {
+        if (!Object.prototype.hasOwnProperty.call(state[userKey], monthKey)) {
+          state[userKey][monthKey] = 0;
+        } else {
+          state[userKey][monthKey] = normalizeUlnnOtValue(state[userKey][monthKey]);
+        }
+      });
+      saveUlnnOtState(state);
+      return state[userKey];
+    }
+
+    function getUlnnOtValue(userKey, monthKey) {
+      var state = loadUlnnOtState();
+      var entry = state[userKey] || {};
+      return normalizeUlnnOtValue(entry[monthKey]);
+    }
+
+    function setUlnnOtValue(userKey, monthKey, rawValue) {
+      if (!userKey || !monthKey) return;
+      var state = loadUlnnOtState();
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: 0, 'n-1': 0, 'n-2': 0 };
+      }
+      state[userKey][monthKey] = normalizeUlnnOtValue(rawValue);
+      saveUlnnOtState(state);
+    }
+
+    function getUlnnOtMonthLabel(monthRanges, idx) {
+      var mr = (monthRanges || [])[idx];
+      if (!mr || !mr.label) return getUlnnMonthKey(idx);
+      return getUlnnMonthKey(idx) + ' • ' + mr.label;
+    }
+
+    function refreshUlnnOtSummary() {
+      var totals = { n: 0, 'n-1': 0, 'n-2': 0 };
+      if (!ulnnSelectedUsers || !ulnnSelectedUsers.length) {
+        var blankIds = ['ulnnOtTotalN', 'ulnnOtTotalN1', 'ulnnOtTotalN2'];
+        blankIds.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = '0';
+        });
+        return totals;
+      }
+
+      ulnnSelectedUsers.forEach(function(user) {
+        var userKey = getUlnnUserStorageKey(user);
+        ULNN_OT_MONTH_KEYS.forEach(function(monthKey) {
+          totals[monthKey] += getUlnnOtValue(userKey, monthKey);
+        });
+      });
+
+      var totalN = document.getElementById('ulnnOtTotalN');
+      var totalN1 = document.getElementById('ulnnOtTotalN1');
+      var totalN2 = document.getElementById('ulnnOtTotalN2');
+      if (totalN) totalN.textContent = formatOdooHours(totals.n) + 'h';
+      if (totalN1) totalN1.textContent = formatOdooHours(totals['n-1']) + 'h';
+      if (totalN2) totalN2.textContent = formatOdooHours(totals['n-2']) + 'h';
+      return totals;
+    }
+
+    function renderUlnnOtSection() {
+      var section = document.getElementById('ulnnOtSection');
+      var headN = document.getElementById('ulnnOtHeadN');
+      var headN1 = document.getElementById('ulnnOtHeadN1');
+      var headN2 = document.getElementById('ulnnOtHeadN2');
+      var tbody = document.getElementById('ulnnOtTableBody');
+      if (!section || !tbody) return;
+
+      if (!ulnnSelectedUsers || !ulnnSelectedUsers.length) {
+        section.classList.add('hidden');
+        tbody.innerHTML = '';
+        refreshUlnnOtSummary();
+        return;
+      }
+
+      section.classList.remove('hidden');
+      var monthRanges = (ulnnModalBaseState && ulnnModalBaseState.monthRanges) || [];
+      if (headN) headN.textContent = getUlnnOtMonthLabel(monthRanges, 0);
+      if (headN1) headN1.textContent = getUlnnOtMonthLabel(monthRanges, 1);
+      if (headN2) headN2.textContent = getUlnnOtMonthLabel(monthRanges, 2);
+
+      var html = ulnnSelectedUsers.map(function(user, index) {
+        var userKey = getUlnnUserStorageKey(user);
+        var entry = ensureUlnnOtEntry(userKey);
+        var displayName = user.name || user.username || userKey || ('User ' + (index + 1));
+        var subLabel = user.username || user.accountId || user.key || userKey;
+        return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">' +
+          '<td class="px-3 py-3 align-top">' +
+            '<div class="font-semibold text-slate-800 text-sm">' + escapeHtml(displayName) + '</div>' +
+            '<div class="text-xs text-slate-400 mt-0.5">' + escapeHtml(subLabel) + '</div>' +
+          '</td>' +
+          ULNN_OT_MONTH_KEYS.map(function(monthKey) {
+            var value = entry[monthKey];
+            return '<td class="px-3 py-3 align-top">' +
+              '<input type="number" min="0" step="0.1" inputmode="decimal" ' +
+                'value="' + escapeHtml(value || value === 0 ? String(value) : '0') + '" ' +
+                'oninput="updateUlnnOtValue(\'' + escapeJsString(userKey) + '\', \'' + monthKey + '\', this.value)" ' +
+                'class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500" />' +
+            '</td>';
+          }).join('') +
+        '</tr>';
+      }).join('');
+
+      tbody.innerHTML = html;
+      refreshUlnnOtSummary();
+    }
+
+    function updateUlnnOtValue(userKey, monthKey, rawValue) {
+      setUlnnOtValue(userKey, monthKey, rawValue);
+      refreshUlnnOtSummary();
+      if (ulnnModalBaseState) {
+        renderUlnnChart(ulnnModalBaseState);
+      }
+    }
+
+    function invalidateUlnnModalChart() {
+      ulnnModalBaseState = null;
+      renderUlnnChart(null);
+    }
+
     // NOTE: loadDashboardUlnnData was removed — ULNN chart is rendered directly inside renderDashboard()
     // using allIssues (which respects the external date filter). The modal ULNN chart uses its own
     // loadUlnnData() function with the last-3-months-independent range.
@@ -1666,6 +1907,213 @@
     function toHours(seconds) {
       if (!seconds && seconds !== 0) return 0;
       return parseFloat((seconds / 3600).toFixed(1));
+    }
+
+    function formatOdooHours(value) {
+      var hours = Number(value);
+      if (!Number.isFinite(hours)) return '-';
+      return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+    }
+
+    function getOdooAccountAliases() {
+      var profile = odooSessionProfile || {};
+      var rawValues = [
+        profile.login,
+        profile.email,
+        profile.name,
+        profile.display_name,
+        profile.username,
+        profile.account,
+        profile.user_login
+      ];
+      var aliases = [];
+      var seen = {};
+      rawValues.forEach(function(value) {
+        if (!value) return;
+        var normalized = String(value).trim().toLowerCase();
+        if (!normalized) return;
+        if (!seen[normalized]) {
+          seen[normalized] = true;
+          aliases.push(normalized);
+        }
+        if (normalized.indexOf('@') > -1) {
+          var localPart = normalized.split('@')[0];
+          if (localPart && !seen[localPart]) {
+            seen[localPart] = true;
+            aliases.push(localPart);
+          }
+        }
+      });
+      return aliases;
+    }
+
+    function isLoggedInOdooAccount(label) {
+      var candidate = String(label || '').trim().toLowerCase();
+      if (!candidate) return false;
+      var aliases = getOdooAccountAliases();
+      for (var i = 0; i < aliases.length; i++) {
+        var alias = aliases[i];
+        if (candidate === alias || candidate.indexOf(alias) > -1 || alias.indexOf(candidate) > -1) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function readJsonResponse(response) {
+      var text = await response.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch (error) {
+        return { ok: false, message: text || error.message };
+      }
+    }
+
+    function getStoredOdooSessionToken() {
+      try {
+        return window.sessionStorage.getItem('odoo_session_token') || '';
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function consumeOdooSessionTokenFromHash() {
+      var hash = String(window.location.hash || '').replace(/^#/, '');
+      if (!hash) {
+        return '';
+      }
+
+      var params = new URLSearchParams(hash);
+      var token = params.get('odoo_token') || '';
+      if (!token) {
+        return '';
+      }
+
+      try {
+        window.sessionStorage.setItem('odoo_session_token', token);
+      } catch (error) {
+        // Ignore storage failures; the current page can still use the token directly.
+      }
+
+      try {
+        if (window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        }
+      } catch (error) {
+        // Ignore history failures.
+      }
+
+      return token;
+    }
+
+    function buildStatCards() {
+      var totalIssues = allIssues.length;
+      var totalEst = 0, totalLog = 0, closedEst = 0, closedLog = 0;
+
+      allIssues.forEach(function(i) {
+        var tt = i.fields.timetracking || {};
+        var est = tt.originalEstimateSeconds || 0;
+        var log = tt.timeSpentSeconds || 0;
+        totalEst += est;
+        totalLog += log;
+        var s = normalizeStatus(i.fields.status);
+        if (s.key === 'CLOSED') {
+          closedEst += est;
+          closedLog += log;
+        }
+      });
+
+      var workdaysInRange = countWeekdaysInRange((currentDateRange || {}).startDate, (currentDateRange || {}).endDate);
+      var ngayCong = workdaysInRange;
+      var closedEstHours = toHours(closedEst);
+      var ulnnGlobal = closedEstHours > 0 ? Math.round((ngayCong * 7 * 100) / closedEstHours) : 0;
+      var odooHoursLabel = odooOverTimeHours !== null && odooOverTimeHours !== undefined
+        ? formatOdooHours(odooOverTimeHours) + 'h'
+        : '-';
+      var odooLoginLabel = odooSessionProfile && odooSessionProfile.login
+        ? String(odooSessionProfile.login)
+        : '';
+      var odooHoursSub = odooSessionProfile
+        ? 'Từ eGen' + (odooLoginLabel ? ' · ' + odooLoginLabel : '') + ' · ' + odooHoursLabel
+        : 'Đang chờ đồng bộ eGen';
+
+      return [
+        { label: 'Σ Issue', value: totalIssues, sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+        { label: 'Σ Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+        { label: 'Σ Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedEst) + 'h est \xb7 ' + toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
+        { label: 'Σ Giờ OT', value: odooHoursLabel, sub: odooHoursSub, color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
+      ];
+    }
+
+    function renderStatCards() {
+      var colors = { blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500' };
+      var textColors = { blue: 'text-blue-600', violet: 'text-violet-600', emerald: 'text-emerald-600', amber: 'text-amber-600' };
+      var bgColors = { blue: 'bg-blue-50', violet: 'bg-violet-50', emerald: 'bg-emerald-50', amber: 'bg-amber-50' };
+      var cardsHTML = buildStatCards().map(function(c) {
+        return '<div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-200 p-5">' +
+          '<div class="flex items-center justify-between mb-3">' +
+            '<div class="' + bgColors[c.color] + ' ' + colors[c.color] + ' w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">' +
+              '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + c.icon + '"/></svg>' +
+            '</div>' +
+            '<div class="' + textColors[c.color] + ' text-3xl font-extrabold text-right leading-none">' + c.value + '</div>' +
+          '</div>' +
+          '<div class="text-slate-600 text-xs font-semibold">' + c.label + '</div>' +
+          '<div class="text-slate-400 text-xs mt-0.5">' + c.sub + '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('statCards').innerHTML = cardsHTML;
+    }
+
+    async function hydrateOdooSession() {
+      if (odooHydrationPromise) {
+        return odooHydrationPromise;
+      }
+
+      var token = getStoredOdooSessionToken() || consumeOdooSessionTokenFromHash();
+      if (!token) {
+        return null;
+      }
+
+      odooHydrationPromise = (async function() {
+        try {
+          var response = await fetch('/api/odoo/me', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': '*',
+              Authorization: 'Bearer ' + token
+            }
+          });
+          var data = await readJsonResponse(response);
+          if (!response.ok || !data || !data.ok) {
+            if (response.status === 401 || response.status === 403) {
+              try {
+                window.sessionStorage.removeItem('odoo_session_token');
+              } catch (error) {
+                // Ignore storage failures.
+              }
+            }
+            throw new Error((data && data.message) || 'Odoo profile request failed');
+          }
+
+          odooSessionProfile = data.profile || null;
+          var overTimeRaw = (data && typeof data.over_time !== 'undefined')
+            ? data.over_time
+            : (((data.profile || {}).stats || {}).totalOverTime);
+          var overTimeNumber = Number(overTimeRaw);
+          odooOverTimeHours = Number.isFinite(overTimeNumber) ? overTimeNumber : null;
+          renderStatCards();
+          return data.profile || null;
+        } catch (error) {
+          console.warn('[ODOO] hydrate session failed', error);
+          odooSessionProfile = null;
+          odooOverTimeHours = null;
+          renderStatCards();
+          return null;
+        }
+      })();
+
+      return odooHydrationPromise;
     }
 
     function fmtDate(iso) {
@@ -1944,58 +2392,11 @@
     function renderDashboard() {
       var loading = document.getElementById('loadingState');
       var content = document.getElementById('dashboardContent');
+      var totalIssues = allIssues.length;
       loading.classList.add('hidden');
       content.classList.remove('hidden');
 
-      // ---- Stats ----
-      var totalIssues = allIssues.length;
-      var totalEst = 0, totalLog = 0, closedEst = 0, closedLog = 0, resolvedEst = 0, resolvedLog = 0;
-
-      allIssues.forEach(function(i) {
-        var tt = i.fields.timetracking || {};
-        var est = tt.originalEstimateSeconds || 0;
-        var log = tt.timeSpentSeconds || 0;
-        totalEst += est;
-        totalLog += log;
-        var s = normalizeStatus(i.fields.status);
-        if (s.key === 'CLOSED') {
-          closedEst += est; closedLog += log;
-        }
-        if (s.key === 'RESOLVED') {
-          resolvedEst += est; resolvedLog += log;
-        }
-
-      });
-
-      // ULNN = so ngay cong weekday (trua T7,CN) * 7h / tong estimate Closed
-      var workdaysInRange = countWeekdaysInRange((currentDateRange || {}).startDate, (currentDateRange || {}).endDate);
-      var ngayCong = workdaysInRange;
-      var closedEstHours = toHours(closedEst);
-      var ulnnGlobal = closedEstHours > 0 ? Math.round((ngayCong * 7 * 100) / closedEstHours) : 0;
-      var statCards = [
-        { label: 'Tổng Issue', value: totalIssues, sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-        { label: 'Tổng Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-        { label: 'Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedEst) + 'h est \xb7 ' + toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
-        { label: 'Giờ Resolved', value: toHours(resolvedEst) + 'h est', sub: toHours(resolvedEst) + 'h est \xb7 ' + toHours(resolvedLog) + 'h log', color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
-      ];
-
-      var colors = { blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500' };
-      var textColors = { blue: 'text-blue-600', violet: 'text-violet-600', emerald: 'text-emerald-600', amber: 'text-amber-600' };
-      var bgColors = { blue: 'bg-blue-50', violet: 'bg-violet-50', emerald: 'bg-emerald-50', amber: 'bg-amber-50' };
-
-      var cardsHTML = statCards.map(function(c) {
-        return '<div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-200 p-5">' +
-          '<div class="flex items-center justify-between mb-3">' +
-            '<div class="' + bgColors[c.color] + ' ' + colors[c.color] + ' w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">' +
-              '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + c.icon + '"/></svg>' +
-            '</div>' +
-            '<div class="' + textColors[c.color] + ' text-3xl font-extrabold text-right leading-none">' + c.value + '</div>' +
-          '</div>' +
-          '<div class="text-slate-600 text-xs font-semibold">' + c.label + '</div>' +
-          '<div class="text-slate-400 text-xs mt-0.5">' + c.sub + '</div>' +
-        '</div>';
-      }).join('');
-      document.getElementById('statCards').innerHTML = cardsHTML;
+      renderStatCards();
 
       // ---- Status breakdown for chart ----
       var statusMap = {};
@@ -2103,7 +2504,8 @@
       var ulnnData = ulnnLabels.map(function(k) {
         var estHours = (ulnnAssigneeMap[k].est || 0) / 3600;
         var ngayCongAssignee = Object.keys(ulnnAssigneeWeekdayLogMap[k] || {}).length;
-        return estHours > 0 ? +(ngayCongAssignee * 7 / estHours).toFixed(3) : 0;
+        var overtimeHours = isLoggedInOdooAccount(k) ? Number(odooOverTimeHours || 0) : 0;
+        return estHours > 0 ? +((ngayCongAssignee * 7 + overtimeHours) / estHours).toFixed(3) : 0;
       });
 
       if (dashboardUlnnChart) dashboardUlnnChart.destroy();
@@ -2153,7 +2555,16 @@
                   var estH = toHours(_ulnnAssigneeMap[key].est || 0);
                   var logH = toHours(_ulnnAssigneeMap[key].log || 0);
                   var ngayCongAssignee = Object.keys(_ulnnAssigneeWeekdayLogMap[key] || {}).length;
-                  return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Σ Ngày Công: ' + ngayCongAssignee;
+                  var odooHoursText = isLoggedInOdooAccount(key) && odooOverTimeHours !== null && odooOverTimeHours !== undefined
+                    ? formatOdooHours(odooOverTimeHours) + ' h'
+                    : '0 h';
+                  return [
+                    'ULNN: ' + Number(ctx.parsed.y).toFixed(3),
+                    'Est: ' + estH + ' h',
+                    'LogWork: ' + logH + ' h',
+                    'OT: ' + odooHoursText,
+                    'Σ Ngày Công: ' + ngayCongAssignee + ' d'
+                  ];
                 }
               }
             }

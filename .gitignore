@@ -1,0 +1,15 @@
+# Environment variables - NEVER commit
+.env
+.env.local
+.env.production
+.env*.local
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+.env.*.local
+
+# Local OAuth client secrets
+doc/client_secret_*.json
