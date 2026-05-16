@@ -562,7 +562,8 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /Authorization: 'Bearer ' \+ token/);
   assert.match(html, /hydrateOdooSession/);
   assert.match(html, /renderStatCards/);
-  assert.match(html, /ngayCongAssignee \* 7 \+ overtimeHours/);
+  assert.match(html, /isLoggedInOdooAccount\(k\) \? Number\(odooOverTimeHours \|\| 0\) : 0/);
+  assert.match(html, /isLoggedInOdooAccount\(key\) && odooOverTimeHours !== null && odooOverTimeHours !== undefined/);
 });
 
 test('config failures return a clear error shape', async () => {
