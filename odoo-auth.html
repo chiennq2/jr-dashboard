@@ -589,7 +589,8 @@
             credentials: 'include',
             body: JSON.stringify({
               otp: otpCode.value.trim(),
-              pending_token: pendingToken
+              pending_token: pendingToken,
+              account: accountInput.value.trim()
             })
           });
           const data = await readJson(response);

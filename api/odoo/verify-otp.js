@@ -2,6 +2,7 @@ const { getOdooConfig } = require('./_config');
 const { readRequestBody, callUpstreamVerifyOtp } = require('./_service');
 const { getEncryptedCookie, setEncryptedCookie, clearEncryptedCookie } = require('./_cookies');
 const { sendJson } = require('./_response');
+const { setSessionCookie } = require('../_auth');
 
 module.exports = async (req, res) => {
   let config;
@@ -30,6 +31,7 @@ module.exports = async (req, res) => {
 
   const otp = String(body.otp || body.otp_code || '').trim();
   const pendingTokenFromBody = String(body.pending_token || body.pendingToken || '').trim();
+  const account = String(body.account || body.login || '').trim();
   if (!otp) {
     sendJson(res, 400, {
       ok: false,
@@ -69,6 +71,15 @@ module.exports = async (req, res) => {
       config.authSecret,
       config.sessionAgeSeconds
     );
+    try {
+      setSessionCookie(res, {
+        email: account || 'odoo@local',
+        name: account || 'Odoo User',
+        picture: ''
+      });
+    } catch (sessionError) {
+      console.warn('[ODOO] failed to set dashboard session cookie', sessionError.message);
+    }
     clearEncryptedCookie(res, config.pendingCookieName);
 
     sendJson(res, 200, {
