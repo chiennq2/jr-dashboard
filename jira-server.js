@@ -1,11 +1,14 @@
+// Load environment variables from .env.local
+require('dotenv').config({ path: '.env.local' });
+
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const JIRA_BASE = 'https://20.84.97.109:3033';
+const JIRA_BASE = process.env.JIRA_BASE || 'https://20.84.97.109:3033';
 const JIRA_TOKEN = process.env.JIRA_TOKEN || '';
-const PORT = 3456;
+const PORT = process.env.PORT || 3456;
 const ROOT_DIR = __dirname;
 
 const server = http.createServer((req, res) => {

@@ -40,6 +40,40 @@
           <p class="text-blue-200 text-xs">ETC Project &bull; Tự động cập nhật mỗi lần tải lại</p>
         </div>
       </div>
+
+        <div id="ulnnModal" class="hidden fixed inset-0 z-50">
+          <div class="absolute inset-0 bg-slate-900/50" onclick="closeUlnnModal()"></div>
+          <div class="relative mx-auto mt-10 w-[92vw] max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">ULNN - 3 tháng gần nhất</h3>
+              <button onclick="closeUlnnModal()" class="text-slate-500 hover:text-slate-700 text-sm font-semibold">Đóng</button>
+            </div>
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-4 items-end">
+              <div class="flex flex-col gap-1.5 flex-1 min-w-[320px]">
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tài khoản / Tên (chọn nhiều)</label>
+                <div class="relative">
+                  <div id="ulnnUserChips" class="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-slate-300 rounded-lg bg-white cursor-text" onclick="document.getElementById('ulnnUserInput').focus()">
+                    <div id="ulnnUserTags"></div>
+                    <input id="ulnnUserInput" type="text" autocomplete="off" placeholder="Chọn nhiều tài khoản..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
+                    <button id="clearUlnnUsers" type="button" onclick="clearUlnnUsers()" class="hidden ml-auto text-xs font-semibold text-slate-500 hover:text-slate-700">Xóa</button>
+                  </div>
+                  <div id="ulnnUserDropdown" class="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 w-full max-h-56 overflow-y-auto hidden"></div>
+                </div>
+              </div>
+              <button onclick="loadUlnnData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium">Áp dụng</button>
+            </div>
+            <div class="p-6">
+              <div id="ulnnEmpty" class="hidden text-center text-slate-400 py-16 text-sm font-medium">Không có dữ liệu ULNN</div>
+              <div id="ulnnLoading" class="hidden flex items-center justify-center py-12">
+                <div class="spinner mr-3"></div>
+                <div class="text-slate-600 font-medium">Đang tải dữ liệu...</div>
+              </div>
+              <div id="ulnnCanvasWrap" style="height:420px">
+                <canvas id="ulnnChartModal"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
       <div class="flex items-center gap-3">
         <div id="refreshTime" class="text-blue-200 text-sm hidden"></div>
         <a href="/api/auth/logout" class="bg-slate-800/30 hover:bg-slate-800/45 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Đăng xuất</a>
@@ -47,10 +81,17 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 8l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
           Xuất báo cáo
         </button>
-        <button onclick="openDailyLogworkModal()" class="bg-amber-500/90 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          Logwork theo ngày
-        </button>
+        <div class="relative">
+          <button id="viewChartsBtn" onclick="toggleChartsDropdown()" class="bg-amber-500/90 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Xem biểu đồ
+            <svg class="w-3 h-3 ml-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </button>
+          <div id="chartsDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
+            <button type="button" onclick="openDailyLogworkModal(); hideChartsDropdown();" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-slate-700">Logwork theo ngày</button>
+            <button type="button" onclick="openUlnnModal(); hideChartsDropdown();" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-slate-700">ULNN - 3 tháng gần nhất</button>
+          </div>
+        </div>
         <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Tải lại
@@ -112,7 +153,7 @@
     </div>
 
     <div id="dashboardContent" class="hidden">
-      <div id="statCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+      <div id="statCards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">Giờ theo trạng thái</h3>
@@ -123,8 +164,14 @@
           <div style="height:280px"><canvas id="barChart"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">ULNN theo Assignee</h3>
-          <div style="height:280px"><canvas id="ulnnChart"></canvas></div>
+          <h3 class="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-4">Ước lượng nỗ lực</h3>
+          <div style="height:280px" class="relative">
+            <div id="ulnnDashboardLoading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-white/75 z-10">
+              <div class="spinner mb-3"></div>
+              <div class="text-slate-600 font-medium">Đang tải ULNN...</div>
+            </div>
+            <div style="height:280px"><canvas id="ulnnChart"></canvas></div>
+          </div>
         </div>
       </div>
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -196,6 +243,10 @@
       </div>
       <div class="p-6">
         <div id="dailyLogworkEmpty" class="hidden text-center text-slate-400 py-16 text-sm font-medium">Không có logwork trong ngày</div>
+        <div id="dailyLogworkLoading" class="hidden flex items-center justify-center py-12">
+          <div class="spinner mr-3"></div>
+          <div class="text-slate-600 font-medium">Đang tải dữ liệu...</div>
+        </div>
         <div id="dailyLogworkCanvasWrap" style="height:380px">
           <canvas id="dailyLogworkChart"></canvas>
         </div>
@@ -214,7 +265,6 @@
     let allIssues = [];
     let statusChart = null;
     let barChart = null;
-    let ulnnChart = null;
     let dailyLogworkChart = null;
     let loadTimer = null;
     let currentIssuePage = 1;
@@ -228,6 +278,12 @@
     let dailySelectedUsers = [];
     let dailyCachedUsers = null;
     let dailyUserFetchTimer = null;
+    // ULNN (12 months) state
+    let ulnnSelectedUsers = [];
+    let ulnnCachedUsers = null;
+    let ulnnUserFetchTimer = null;
+    let dashboardUlnnChart = null;
+    let modalUlnnChart = null;
     const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -237,6 +293,7 @@
         try { initAssigneeAutocomplete(); } catch(e) { console.error('assignee init error', e); }
         try { initDailyLogworkPicker(); } catch(e) { console.error('daily picker init error', e); }
         try { initDailyUserAutocomplete(); } catch(e) { console.error('daily user init error', e); }
+        try { initUlnnUserAutocomplete(); } catch(e) { console.error('ulnn user init error', e); }
         try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
         try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
         try { await loadData(); } catch(e) { console.error('loadData error', e); }
@@ -426,6 +483,13 @@
       return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     }
 
+    function getLastNMonthsExcludeCurrentRange(n) {
+      var now = new Date();
+      var start = new Date(now.getFullYear(), now.getMonth() - n, 1);
+      var end = new Date(now.getFullYear(), now.getMonth(), 0); // last day of previous month
+      return { startDate: toJiraDate(start), endDate: toJiraDate(end) };
+    }
+
     function initDailyLogworkPicker() {
       if (typeof flatpickr === 'undefined') return;
       var today = new Date();
@@ -440,20 +504,48 @@
           dailyLogworkDate = toJiraDate(selectedDates[0]);
         }
       });
+      // Ensure visible value even if flatpickr didn't attach UI immediately
+      try {
+        var el = document.getElementById('dailyLogworkDate');
+        if (el && !el.value) el.value = formatDisplayDate(today);
+      } catch (e) {}
     }
 
     function openDailyLogworkModal() {
       var modal = document.getElementById('dailyLogworkModal');
+      if (!modal) return;
       modal.classList.remove('hidden');
       var now = new Date();
+      // Always set dailyLogworkDate to today when opening modal
       dailyLogworkDate = toJiraDate(now);
-      var picker = document.getElementById('dailyLogworkDate')._flatpickr;
-      if (picker) picker.setDate(now, false);
+      var inputEl = document.getElementById('dailyLogworkDate');
+      var picker = inputEl && inputEl._flatpickr;
+      if (picker) {
+        // Sync flatpickr display to today; the input value is set automatically by flatpickr
+        try { picker.setDate(now, false); } catch (e) { /* ignore */ }
+      } else {
+        // Flatpickr not yet attached — initialize it now
+        try { initDailyLogworkPicker(); } catch (e) {}
+        picker = inputEl && inputEl._flatpickr;
+        if (picker) {
+          try { picker.setDate(now, false); } catch (e) { /* ignore */ }
+        } else if (inputEl) {
+          // Absolute fallback: set the visible input value directly
+          inputEl.value = formatDisplayDate(now);
+        }
+      }
+      // Also set the visible input value in case flatpickr's internal state is out of sync
+      if (inputEl && !inputEl.value) inputEl.value = formatDisplayDate(now);
       dailySelectedUsers = [];
       renderDailyUserTags();
       var dailyUserInput = document.getElementById('dailyUserInput');
       if (dailyUserInput) dailyUserInput.value = '';
       loadDailyLogworkData();
+    }
+
+    function formatDisplayDate(d) {
+      if (!d) return '';
+      return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
     }
 
     function closeDailyLogworkModal() {
@@ -660,6 +752,9 @@
           }
         }
       });
+
+      // NOTE: ULNN chart on dashboard is loaded separately via loadDashboardUlnnData()
+      // called at the end of loadData(), not here.
     }
 
     async function loadDailyLogworkData() {
@@ -669,6 +764,10 @@
           applyBtn.disabled = true;
           applyBtn.textContent = 'Đang tải...';
         }
+        var dailyLoadingEl = document.getElementById('dailyLogworkLoading');
+        var dailyCanvasWrap = document.getElementById('dailyLogworkCanvasWrap');
+        if (dailyLoadingEl) { dailyLoadingEl.classList.remove('hidden'); }
+        if (dailyCanvasWrap) { dailyCanvasWrap.classList.add('hidden'); }
         var dateStr = dailyLogworkDate || toJiraDate(new Date());
         dailyLogworkDate = dateStr;
         var jql = 'worklogDate = "' + dateStr + '"';
@@ -724,8 +823,453 @@
           applyBtnDone.disabled = false;
           applyBtnDone.textContent = 'Áp dụng';
         }
+        if (dailyLoadingEl) { dailyLoadingEl.classList.add('hidden'); }
+        if (dailyCanvasWrap) { dailyCanvasWrap.classList.remove('hidden'); }
       }
     }
+
+      // Dropdown helpers for charts button
+      function toggleChartsDropdown() {
+        var el = document.getElementById('chartsDropdown');
+        if (!el) return;
+        if (el.classList.contains('hidden')) el.classList.remove('hidden'); else el.classList.add('hidden');
+      }
+      function hideChartsDropdown() { var el = document.getElementById('chartsDropdown'); if (el) el.classList.add('hidden'); }
+
+      // ULNN modal and user autocomplete
+      function initUlnnUserAutocomplete() {
+        var input = document.getElementById('ulnnUserInput');
+        var dropdown = document.getElementById('ulnnUserDropdown');
+        if (!input || !dropdown) return;
+
+        input.addEventListener('focus', function() {
+          var val = input.value.trim();
+          if (!val) return;
+          if (!ulnnCachedUsers) scheduleUlnnUserFetch(val);
+          else showUlnnUserDropdown(filterUlnnUsers(val));
+        });
+
+        input.addEventListener('input', function() {
+          var val = input.value.trim();
+          if (!val) { dropdown.classList.add('hidden'); return; }
+          if (ulnnCachedUsers && ulnnCachedUsers.length) showUlnnUserDropdown(filterUlnnUsers(val));
+          scheduleUlnnUserFetch(val);
+        });
+
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); var matches = filterUlnnUsers(input.value.trim()); if (matches.length > 0) selectUlnnUser(matches[0]); }
+          if (e.key === 'Backspace' && !input.value && ulnnSelectedUsers.length > 0) { removeUlnnUser(ulnnSelectedUsers.length - 1); }
+        });
+
+        input.addEventListener('blur', function() { setTimeout(function() { dropdown.classList.add('hidden'); }, 300); });
+
+        document.addEventListener('click', function(e) {
+          if (!document.getElementById('ulnnUserChips').contains(e.target)) { dropdown.classList.add('hidden'); }
+        });
+
+        renderUlnnUserTags();
+      }
+
+      function scheduleUlnnUserFetch(query) { clearTimeout(ulnnUserFetchTimer); ulnnUserFetchTimer = setTimeout(function() { fetchUlnnUserList(query); }, 220); }
+
+      async function fetchUlnnUserList(query) {
+        try {
+          var q = (query || '').trim();
+          if (!q) { ulnnCachedUsers = []; showUlnnUserDropdown([]); return; }
+          ulnnCachedUsers = (await searchUsers(q, false)).sort(function(a,b){ return a.name.localeCompare(b.name); });
+          showUlnnUserDropdown(filterUlnnUsers(document.getElementById('ulnnUserInput').value.trim()));
+        } catch (e) { ulnnCachedUsers = []; showUlnnUserDropdown([]); }
+      }
+
+      function filterUlnnUsers(query) { if (!ulnnCachedUsers || !query) return []; var q = query.toLowerCase(); return ulnnCachedUsers.filter(function(u){ return (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.username||'').toLowerCase().includes(q) || (u.key||'').toLowerCase().includes(q) || (u.id||'').toLowerCase().includes(q); }).slice(0,10); }
+
+      function showUlnnUserDropdown(users) {
+        var dropdown = document.getElementById('ulnnUserDropdown'); if (!dropdown) return; if (!users.length) { dropdown.classList.add('hidden'); return; }
+        dropdown.innerHTML = users.map(function(u) {
+          return '<button type="button" data-user-id="' + escapeHtml(u.id) + '" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center gap-2">' +
+            '<div class="w-7 h-7 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">' + escapeHtml((u.name || '?').charAt(0).toUpperCase()) + '</div>' +
+            '<div><div class="font-medium">' + escapeHtml(u.name) + '</div><div class="text-xs text-slate-400">' + escapeHtml(u.email || u.username || u.id) + '</div></div>' +
+          '</button>';
+        }).join('');
+        var buttons = dropdown.querySelectorAll('button[data-user-id]');
+        buttons.forEach(function(btn){ btn.addEventListener('mousedown', function(e){ e.preventDefault(); var id = this.getAttribute('data-user-id'); var user = users.find(function(u){ return u.id === id; }); if (user) selectUlnnUser(user); }); });
+        dropdown.classList.remove('hidden');
+      }
+
+      function renderUlnnUserTags() {
+        var tags = document.getElementById('ulnnUserTags'); var clearBtn = document.getElementById('clearUlnnUsers'); if (!tags || !clearBtn) return;
+        tags.innerHTML = ulnnSelectedUsers.map(function(a, idx) { return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">' + escapeHtml(a.name) + '<button type="button" onclick="removeUlnnUser('+idx+')" class="text-amber-500 hover:text-amber-700">×</button>' + '</span>'; }).join('');
+        if (ulnnSelectedUsers.length > 0) clearBtn.classList.remove('hidden'); else clearBtn.classList.add('hidden');
+      }
+
+      function selectUlnnUser(user) {
+        if (!user || !user.id) return; var exists = ulnnSelectedUsers.some(function(a){ return a.id === user.id; }); if (exists) { document.getElementById('ulnnUserInput').value = ''; document.getElementById('ulnnUserDropdown').classList.add('hidden'); return; }
+        ulnnSelectedUsers.push({ id: user.id, accountId: user.accountId||'', username: user.username||'', key: user.key||'', name: user.name||user.username||user.id });
+        renderUlnnUserTags(); document.getElementById('ulnnUserInput').value = ''; document.getElementById('ulnnUserDropdown').classList.add('hidden');
+      }
+
+      function removeUlnnUser(index) { if (index<0||index>=ulnnSelectedUsers.length) return; ulnnSelectedUsers.splice(index,1); renderUlnnUserTags(); }
+      function clearUlnnUsers() { ulnnSelectedUsers = []; document.getElementById('ulnnUserInput').value=''; renderUlnnUserTags(); }
+
+      function openUlnnModal() { var modal = document.getElementById('ulnnModal'); if (!modal) return; modal.classList.remove('hidden'); renderUlnnUserTags(); var inp = document.getElementById('ulnnUserInput'); if (inp) inp.value=''; /* do not auto-load: wait for user to select accounts and press Áp dụng */ }
+      function closeUlnnModal() { var modal = document.getElementById('ulnnModal'); if (!modal) return; modal.classList.add('hidden'); }
+
+      // Full pagination search with custom fields — unlike fetchAllIssuesWithCap, this never swallows errors silently
+      async function fetchAllIssuesWithFields(jql, fields) {
+        var startAt = 0, total = Infinity, results = [];
+        var useFields = fields ? '&fields=' + encodeURIComponent(fields) : '';
+        while (startAt < total) {
+          var data = await jiraFetch('/rest/api/2/search?jql=' + encodeURIComponent(jql) + '&startAt=' + startAt + '&maxResults=100' + useFields);
+          total = data.total || 0;
+          var issues = data.issues || [];
+          results = results.concat(issues);
+          startAt += issues.length;
+          if (!issues.length) break;
+        }
+        return results;
+      }
+
+      async function loadUlnnData() {
+        var loadingEl = document.getElementById('ulnnLoading');
+        var loadingTextEl = loadingEl ? loadingEl.querySelector('.text-slate-600') || loadingEl.querySelector('div:last-child') : null;
+        function setProgress(msg) { if (loadingTextEl) loadingTextEl.textContent = msg; }
+        try {
+          var applyBtn = document.querySelector('#ulnnModal button[onclick="loadUlnnData()"]'); if (applyBtn) { applyBtn.disabled=true; applyBtn.textContent='Đang tải...'; }
+          if (loadingEl) { loadingEl.classList.remove('hidden'); }
+          var canvasWrap = document.getElementById('ulnnCanvasWrap'); if (canvasWrap) canvasWrap.classList.add('hidden');
+          if (!ulnnSelectedUsers || ulnnSelectedUsers.length === 0) {
+            showToast('Vui lòng chọn ít nhất 1 tài khoản rồi nhấn Áp dụng', true);
+            renderUlnnChart([], []);
+            cleanupApplyBtn();
+            if (loadingEl) { loadingEl.classList.add('hidden'); }
+            return;
+          }
+          var now = new Date();
+
+          // Build 3 month ranges:
+          // Month 0 (current): 01/current_month -> today
+          // Month 1 (previous): 01/prev_month -> last day of prev_month
+          // Month 2 (2 months ago): 01/two_months_ago -> last day of two_months_ago
+          var monthRanges = [];
+          for (var mi = 0; mi < 3; mi++) {
+            var mStart = new Date(now.getFullYear(), now.getMonth() - mi, 1);
+            var mEnd;
+            if (mi === 0) {
+              mEnd = new Date(now); // today for current month
+            } else {
+              mEnd = new Date(now.getFullYear(), now.getMonth() - mi + 1, 0); // last day of that month
+            }
+            var mLabel = ('0'+(mStart.getMonth()+1)).slice(-2) + '/' + mStart.getFullYear();
+            monthRanges.push({
+              startDate: toJiraDate(mStart),
+              endDate: toJiraDate(mEnd),
+              label: mLabel
+            });
+          }
+
+          // Build comprehensive set of selected user identifiers for flexible matching
+          // Each user can be identified by accountId, key, username, displayName, email
+          // We need to map ALL possible author identifiers back to a canonical user ID
+          var userCanonicalId = {}; // maps any identifier -> canonical uid
+          var userDisplayNames = {}; // maps canonical uid -> displayName
+          ulnnSelectedUsers.forEach(function(u){
+            var uid = u.accountId || u.key || u.id || u.name;
+            userDisplayNames[uid] = u.name || uid;
+            // Index all possible identifiers for this user
+            var ids = [u.accountId, u.key, u.id, u.username, u.name, u.email].filter(Boolean);
+            ids.forEach(function(id) {
+              if (id) userCanonicalId[id] = uid;
+              // Also try lowercase for case-insensitive matching
+              if (id) userCanonicalId[id.toLowerCase()] = uid;
+            });
+          });
+
+          console.log('[ULNN Modal] Selected users:', ulnnSelectedUsers);
+          console.log('[ULNN Modal] User ID mapping:', userCanonicalId);
+
+          // Helper: match a worklog author or assignee to a selected user, returns canonical uid or null
+          function matchUser(personObj) {
+            if (!personObj) return null;
+            var candidates = [
+              personObj.accountId, personObj.key, personObj.name,
+              personObj.displayName, personObj.emailAddress, personObj.id
+            ];
+            for (var ci = 0; ci < candidates.length; ci++) {
+              var c = candidates[ci];
+              if (!c) continue;
+              if (userCanonicalId[c]) return userCanonicalId[c];
+              if (userCanonicalId[c.toLowerCase()]) return userCanonicalId[c.toLowerCase()];
+            }
+            return null;
+          }
+
+          // Initialize result map: map[uid] = { name, months: [ {worklogDays:{}, estClosed:0}, ... ] }
+          var map = {};
+          ulnnSelectedUsers.forEach(function(u){
+            var uid = u.accountId || u.key || u.id || u.name;
+            if (!map[uid]) map[uid] = {
+              name: u.name || uid,
+              months: [{worklogDays:{}, estClosed:0}, {worklogDays:{}, estClosed:0}, {worklogDays:{}, estClosed:0}]
+            };
+          });
+
+          // --- Process each month separately ---
+          // Build assignee clauses from selected users (same approach as dashboard's buildAssigneeClauses)
+          var quoteJqlValue = function(v) {
+            return '"' + String(v || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+          };
+          var uniqueArr = function(arr) {
+            var seen = {};
+            return arr.filter(function(v) { if (!v || seen[v]) return false; seen[v] = true; return true; });
+          };
+          var ulnnAssigneeIds = uniqueArr(ulnnSelectedUsers.map(function(a) { return a.accountId || ''; }));
+          var ulnnAssigneeNames = uniqueArr(ulnnSelectedUsers.map(function(a) { return a.username || ''; }));
+          var ulnnAssigneeKeys = uniqueArr(ulnnSelectedUsers.map(function(a) { return a.key || ''; }));
+          var ulnnAssigneeClauses = [];
+          if (ulnnAssigneeKeys.length) ulnnAssigneeClauses.push(' AND assignee in (' + ulnnAssigneeKeys.map(quoteJqlValue).join(',') + ')');
+          if (ulnnAssigneeIds.length) ulnnAssigneeClauses.push(' AND assignee in (' + ulnnAssigneeIds.map(quoteJqlValue).join(',') + ')');
+          if (ulnnAssigneeNames.length) ulnnAssigneeClauses.push(' AND assignee in (' + ulnnAssigneeNames.map(quoteJqlValue).join(',') + ')');
+          ulnnAssigneeClauses.push(''); // fallback: no assignee filter
+          ulnnAssigneeClauses = uniqueArr(ulnnAssigneeClauses);
+
+          console.log('[ULNN Modal] Assignee JQL clauses:', ulnnAssigneeClauses);
+
+          for (var mri = 0; mri < monthRanges.length; mri++) {
+            var mr = monthRanges[mri];
+            setProgress('Đang tải tháng ' + mr.label + ' (' + (mri+1) + '/3)...');
+
+            // Try each assignee clause variant until one succeeds with results
+            var jqlBase = 'worklogDate >= "' + mr.startDate + '" AND worklogDate <= "' + mr.endDate + '"';
+            var monthIssues = [];
+            var jqlUsed = '';
+            for (var aci = 0; aci < ulnnAssigneeClauses.length; aci++) {
+              var fullJql = jqlBase + ulnnAssigneeClauses[aci];
+              try {
+                monthIssues = await fetchAllIssuesWithCap(fullJql, 10, 'summary,status,assignee,timetracking,resolutiondate');
+                jqlUsed = fullJql;
+                if (monthIssues.length > 0 || aci === ulnnAssigneeClauses.length - 1) break;
+              } catch (e) {
+                console.warn('[ULNN Modal] JQL variant ' + aci + ' failed for month ' + mr.label + ':', e.message);
+                if (aci === ulnnAssigneeClauses.length - 1) monthIssues = [];
+              }
+            }
+
+            console.log('[ULNN Modal] Month ' + mr.label + ': ' + monthIssues.length + ' issues found | JQL: ' + jqlUsed);
+            if (!monthIssues.length) continue;
+
+            setProgress('Tháng ' + mr.label + ': đang tải worklog (' + monthIssues.length + ' issues)...');
+
+            // Fetch worklogs in parallel batches of 10
+            var BATCH_SIZE = 10;
+            var allWorklogs = new Array(monthIssues.length);
+            for (var bi = 0; bi < monthIssues.length; bi += BATCH_SIZE) {
+              var batchEnd = Math.min(bi + BATCH_SIZE, monthIssues.length);
+              var batchPromises = [];
+              for (var bj = bi; bj < batchEnd; bj++) {
+                (function(idx) {
+                  var ik = monthIssues[idx] && monthIssues[idx].key;
+                  if (!ik) { batchPromises.push(Promise.resolve([])); return; }
+                  batchPromises.push(
+                    fetchIssueWorklogs(ik).catch(function() { return []; })
+                  );
+                })(bj);
+              }
+              var batchResults = await Promise.all(batchPromises);
+              for (var br = 0; br < batchResults.length; br++) {
+                allWorklogs[bi + br] = batchResults[br];
+              }
+              setProgress('Tháng ' + mr.label + ': worklog ' + Math.min(bi + BATCH_SIZE, monthIssues.length) + '/' + monthIssues.length);
+            }
+
+            // Process issues: SAME logic as dashboard ULNN
+            // - estClosed: sum of originalEstimateSeconds for CLOSED issues, grouped by ASSIGNEE
+            // - worklogDays: ALL worklogs on an issue count toward the ASSIGNEE's weekday log days
+            //   (matches buildAssigneeWeekdayLogMap behavior)
+            var estCountedPerIssue = {}; // avoid double-counting est per assignee per issue
+            for (var ii = 0; ii < monthIssues.length; ii++) {
+              var issue = monthIssues[ii];
+              var issueKey = issue && issue.key;
+              var fields = (issue && issue.fields) || {};
+              var statusNorm = normalizeStatus(fields.status || {});
+              var isClosed = (statusNorm.key === 'CLOSED');
+              var estSeconds = fields.timetracking && fields.timetracking.originalEstimateSeconds ? fields.timetracking.originalEstimateSeconds : 0;
+
+              // Match ASSIGNEE of this issue to selected user
+              var assigneeObj = fields.assignee || {};
+              var assigneeUid = matchUser(assigneeObj);
+
+              // Add estClosed based on ASSIGNEE (same as dashboard ULNN)
+              if (isClosed && estSeconds > 0 && assigneeUid && map[assigneeUid]) {
+                var estKey = assigneeUid + '|' + issueKey;
+                if (!estCountedPerIssue[estKey]) {
+                  estCountedPerIssue[estKey] = true;
+                  map[assigneeUid].months[mri].estClosed += estSeconds;
+                }
+              }
+
+              // Process worklogs: count worklog days for the ASSIGNEE (not worklog author!)
+              // This matches buildAssigneeWeekdayLogMap() behavior exactly
+              if (!assigneeUid || !map[assigneeUid]) continue;
+              var wls = allWorklogs[ii] || [];
+              wls.forEach(function(wl){
+                var started = (wl||{}).started; if (!started) return;
+                var d = new Date(started); if (isNaN(d.getTime())) return;
+                // Only weekdays
+                if (!isWeekday(d)) return;
+                var dateStr = toJiraDate(d);
+
+                // Check if this worklog falls within the current month range
+                if (dateStr < mr.startDate || dateStr > mr.endDate) return;
+
+                // Attribute this worklog day to the ASSIGNEE (not the worklog author)
+                map[assigneeUid].months[mri].worklogDays[dateStr] = true;
+              });
+            }
+
+            // Debug: log what we found for this month
+            ulnnSelectedUsers.forEach(function(u){
+              var uid = u.accountId || u.key || u.id || u.name;
+              var m = map[uid] && map[uid].months[mri];
+              if (m) {
+                console.log('[ULNN Modal] ' + mr.label + ' - ' + (u.name||uid) +
+                  ': worklogDays=' + Object.keys(m.worklogDays).length +
+                  ', estClosed=' + (m.estClosed/3600).toFixed(1) + 'h');
+              }
+            });
+          }
+
+          setProgress('Đang vẽ biểu đồ...');
+
+          // Build chart data: labels = user names, datasets = 3 months
+          var userLabels = ulnnSelectedUsers.map(function(u){
+            return u.name || u.accountId || u.key || u.id;
+          });
+          var userIds = ulnnSelectedUsers.map(function(u){
+            return u.accountId || u.key || u.id || u.name;
+          });
+
+          var monthColors = [
+            { bg: 'rgba(245,158,11,0.82)', border: '#f59e0b' },   // current month - amber
+            { bg: 'rgba(59,130,246,0.75)', border: '#3b82f6' },    // previous month - blue
+            { bg: 'rgba(16,185,129,0.70)', border: '#10b981' }     // 2 months ago - green
+          ];
+
+          var datasets = monthRanges.map(function(mr, mIdx){
+            return {
+              label: 'Tháng ' + mr.label,
+              data: userIds.map(function(uid){
+                var u = map[uid];
+                if (!u) return 0;
+                var monthObj = u.months[mIdx];
+                var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
+                var estH = (monthObj.estClosed || 0) / 3600;
+                // ULNN = số ngày có logwork × 7h / tổng estimated của task đã đóng
+                return estH > 0 ? Number(((worklogDays * 7) / estH).toFixed(3)) : 0;
+              }),
+              backgroundColor: monthColors[mIdx].bg,
+              borderColor: monthColors[mIdx].border,
+              borderWidth: 1,
+              borderRadius: 6,
+              borderSkipped: false
+            };
+          });
+
+          var hasAny = datasets.some(function(ds){ return ds.data && ds.data.some(function(v){ return v && v > 0; }); });
+          if (!hasAny) {
+            showToast('Không có dữ liệu ULNN cho tài khoản/khung thời gian đã chọn', true);
+            renderUlnnChart([], []);
+            return;
+          }
+
+          renderUlnnChart(userLabels, datasets, map, userIds, monthRanges);
+        } catch (e) {
+          console.error('loadUlnnData error:', e);
+          showToast('Không tải được dữ liệu ULNN: ' + (e.message || '').substring(0, 80), true);
+          renderUlnnChart([], []);
+        } finally {
+          cleanupApplyBtn();
+          if (loadingEl) loadingEl.classList.add('hidden');
+          var cw = document.getElementById('ulnnCanvasWrap'); if (cw) cw.classList.remove('hidden');
+        }
+      }
+
+      function cleanupApplyBtn() {
+        var applyBtn = document.querySelector('#ulnnModal button[onclick="loadUlnnData()"]');
+        if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = 'Áp dụng'; }
+      }
+
+      function hexToRgba(hex, a) {
+        try { if (!hex) return 'rgba(59,130,246,'+a+')'; var h = hex.replace('#',''); if (h.length===3) h = h.split('').map(function(c){ return c+c; }).join(''); var r = parseInt(h.slice(0,2),16); var g = parseInt(h.slice(2,4),16); var b = parseInt(h.slice(4,6),16); return 'rgba('+r+','+g+','+b+','+a+')'; } catch(e) { return 'rgba(59,130,246,'+a+')'; }
+      }
+
+      function renderUlnnChart(labels, datasets, mapData, userIds, monthRanges) {
+        var emptyEl = document.getElementById('ulnnEmpty'); var wrap = document.getElementById('ulnnCanvasWrap');
+        if (!datasets || datasets.length===0) { if (modalUlnnChart) { modalUlnnChart.destroy(); modalUlnnChart = null; } emptyEl.classList.remove('hidden'); wrap.classList.add('hidden'); return; }
+        emptyEl.classList.add('hidden'); wrap.classList.remove('hidden'); if (modalUlnnChart) modalUlnnChart.destroy();
+        var ctx = document.getElementById('ulnnChartModal').getContext('2d');
+        // Store references for tooltip
+        var _mapData = mapData || {};
+        var _userIds = userIds || [];
+        var _monthRanges = monthRanges || [];
+        modalUlnnChart = new Chart(ctx, {
+          type: 'bar',
+          plugins: [{
+            id: 'ulnnModalValueLabels',
+            afterDatasetsDraw: function(chart) {
+              var c = chart.ctx;
+              c.save();
+              c.font = '600 10px Inter, sans-serif';
+              c.textAlign = 'center';
+              c.textBaseline = 'bottom';
+              var colors = ['#92400e', '#1e40af', '#065f46'];
+              for (var di = 0; di < chart.data.datasets.length; di++) {
+                var meta = chart.getDatasetMeta(di);
+                var data = chart.data.datasets[di].data || [];
+                c.fillStyle = colors[di % colors.length];
+                meta.data.forEach(function(bar, i) {
+                  var v = data[i];
+                  if (v === null || typeof v === 'undefined' || v === 0) return;
+                  c.fillText(Number(v).toFixed(3), bar.x, bar.y - 4);
+                });
+              }
+              c.restore();
+            }
+          }],
+          data: { labels: labels, datasets: datasets },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top', align: 'end', labels: { boxWidth: 12, padding: 16, font: { size: 12 } } },
+              tooltip: {
+                callbacks: {
+                  label: function(ctx) {
+                    var dsIdx = ctx.datasetIndex; // month index
+                    var uIdx = ctx.dataIndex; // user index
+                    var uid = _userIds[uIdx] || '';
+                    var monthObj = (_mapData[uid] && _mapData[uid].months) ? _mapData[uid].months[dsIdx] : null;
+                    var worklogDays = monthObj ? Object.keys(monthObj.worklogDays || {}).length : 0;
+                    var estH = monthObj ? ((monthObj.estClosed || 0) / 3600).toFixed(1) : '0';
+                    var mr = _monthRanges[dsIdx];
+                    var range = mr ? (mr.startDate + ' → ' + mr.endDate) : '';
+                    return ctx.dataset.label + ': ' + Number(ctx.parsed.y||0).toFixed(3)
+                      + ' | Ngày log: ' + worklogDays
+                      + ' | Est Closed: ' + estH + 'h'
+                      + (range ? ' | ' + range : '');
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { grid: { display:false }, ticks: { font: { size: 11 } } },
+              y: {
+                beginAtZero: true,
+                grid: { color: '#f1f5f9' },
+                ticks: { font: { size: 11 }, callback: function(v) { return Number(v).toFixed(2); } }
+              }
+            }
+          }
+        });
+      }
 
     function filterUsers(query) {
       if (!cachedUsers || !query) return [];
@@ -1043,6 +1587,27 @@
       return results;
     }
 
+    // Safer variant: fetch issues with a page cap and optional fields
+    async function fetchAllIssuesWithCap(jql, pageLimit, fields) {
+      var startAt = 0, total = Infinity, results = [];
+      var pages = 0; var maxPages = Math.max(1, pageLimit || 10);
+      var useFields = fields ? '&fields=' + encodeURIComponent(fields) : '&fields=' + encodeURIComponent(FIELDS);
+      try {
+        while (startAt < total && pages < maxPages) {
+          var data = await jiraFetch('/rest/api/2/search?jql=' + encodeURIComponent(jql) + '&startAt=' + startAt + '&maxResults=100' + useFields);
+          total = data.total || 0;
+          var issues = data.issues || [];
+          results = results.concat(issues);
+          startAt += issues.length;
+          pages++;
+          if (!issues.length) break;
+        }
+      } catch (e) {
+        console.warn('fetchAllIssuesWithCap error', e);
+      }
+      return results;
+    }
+
     function parseIsoDateOnly(iso) {
       if (!iso) return null;
       var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1093,6 +1658,10 @@
       });
       return out;
     }
+
+    // NOTE: loadDashboardUlnnData was removed — ULNN chart is rendered directly inside renderDashboard()
+    // using allIssues (which respects the external date filter). The modal ULNN chart uses its own
+    // loadUlnnData() function with the last-3-months-independent range.
 
     function toHours(seconds) {
       if (!seconds && seconds !== 0) return 0;
@@ -1156,7 +1725,7 @@
     }
 
     function exportReportImage() {
-      if (!statusChart || !barChart || !ulnnChart) {
+      if (!statusChart || !barChart || !dashboardUlnnChart) {
         showToast('Chưa có dữ liệu biểu đồ để xuất', true);
         return;
       }
@@ -1232,7 +1801,7 @@
       img3.onerror = function() { fail = true; showToast('Không thể xuất ảnh biểu đồ', true); };
       img1.src = statusChart.toBase64Image();
       img2.src = barChart.toBase64Image();
-      img3.src = ulnnChart.toBase64Image();
+      img3.src = dashboardUlnnChart.toBase64Image();
     }
 
     function buildAssigneeClauses() {
@@ -1404,10 +1973,10 @@
       var closedEstHours = toHours(closedEst);
       var ulnnGlobal = closedEstHours > 0 ? Math.round((ngayCong * 7 * 100) / closedEstHours) : 0;
       var statCards = [
-        { label: 'Tổng Issue', value: totalIssues, sub: toHours(totalEst) + 'h estimate', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-        { label: 'Tổng Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalLog) + 'h đã log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-        { label: 'Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
-        { label: 'Giờ Resolved', value: toHours(resolvedEst) + 'h est', sub: toHours(resolvedLog) + 'h log', color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
+        { label: 'Tổng Issue', value: totalIssues, sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+        { label: 'Tổng Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+        { label: 'Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedEst) + 'h est \xb7 ' + toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
+        { label: 'Giờ Resolved', value: toHours(resolvedEst) + 'h est', sub: toHours(resolvedEst) + 'h est \xb7 ' + toHours(resolvedLog) + 'h log', color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
       ];
 
       var colors = { blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500' };
@@ -1416,13 +1985,13 @@
 
       var cardsHTML = statCards.map(function(c) {
         return '<div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-200 p-5">' +
-          '<div class="flex items-start justify-between mb-3">' +
-            '<div class="' + bgColors[c.color] + ' ' + colors[c.color] + ' w-10 h-10 rounded-xl flex items-center justify-center">' +
+          '<div class="flex items-center justify-between mb-3">' +
+            '<div class="' + bgColors[c.color] + ' ' + colors[c.color] + ' w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">' +
               '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + c.icon + '"/></svg>' +
             '</div>' +
+            '<div class="' + textColors[c.color] + ' text-3xl font-extrabold text-right leading-none">' + c.value + '</div>' +
           '</div>' +
-          '<div class="' + textColors[c.color] + ' text-2xl font-extrabold">' + c.value + '</div>' +
-          '<div class="text-slate-500 text-xs mt-1 font-medium">' + c.label + '</div>' +
+          '<div class="text-slate-600 text-xs font-semibold">' + c.label + '</div>' +
           '<div class="text-slate-400 text-xs mt-0.5">' + c.sub + '</div>' +
         '</div>';
       }).join('');
@@ -1514,49 +2083,52 @@
         }
       });
 
-      // ---- ULNN by assignee ----
-      var assigneeMap = {};
-      var assigneeWeekdayLogMap = buildAssigneeWeekdayLogMap(allIssues, currentDateRange, issueWorklogsByKey);
+      // ---- ULNN by assignee (follows external date filter / currentDateRange) ----
+      var ulnnAssigneeMap = {};
       allIssues.forEach(function(i) {
         var s = normalizeStatus(i.fields.status);
         var tt = i.fields.timetracking || {};
         var aobj = i.fields.assignee || {};
         var aname = aobj.displayName || aobj.name || 'Unassigned';
-        if (!assigneeMap[aname]) assigneeMap[aname] = { est: 0, log: 0 };
-        assigneeMap[aname].log += tt.timeSpentSeconds || 0;
+        if (!ulnnAssigneeMap[aname]) ulnnAssigneeMap[aname] = { est: 0, log: 0 };
+        ulnnAssigneeMap[aname].log += tt.timeSpentSeconds || 0;
         if (s.key === 'CLOSED') {
-          assigneeMap[aname].est += tt.originalEstimateSeconds || 0;
+          ulnnAssigneeMap[aname].est += tt.originalEstimateSeconds || 0;
         }
       });
 
-      var ulnnLabels = Object.keys(assigneeMap);
+      var ulnnAssigneeWeekdayLogMap = buildAssigneeWeekdayLogMap(allIssues, currentDateRange, issueWorklogsByKey);
+
+      var ulnnLabels = Object.keys(ulnnAssigneeMap);
       var ulnnData = ulnnLabels.map(function(k) {
-        var estHours = (assigneeMap[k].est || 0) / 3600;
-        var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[k] || {}).length;
+        var estHours = (ulnnAssigneeMap[k].est || 0) / 3600;
+        var ngayCongAssignee = Object.keys(ulnnAssigneeWeekdayLogMap[k] || {}).length;
         return estHours > 0 ? +(ngayCongAssignee * 7 / estHours).toFixed(3) : 0;
       });
 
-      if (ulnnChart) ulnnChart.destroy();
+      if (dashboardUlnnChart) dashboardUlnnChart.destroy();
       var ctx3 = document.getElementById('ulnnChart').getContext('2d');
-      ulnnChart = new Chart(ctx3, {
+      var _ulnnAssigneeMap = ulnnAssigneeMap;
+      var _ulnnAssigneeWeekdayLogMap = ulnnAssigneeWeekdayLogMap;
+      dashboardUlnnChart = new Chart(ctx3, {
         type: 'bar',
         plugins: [{
           id: 'ulnnValueLabels',
           afterDatasetsDraw: function(chart) {
-            var ctx = chart.ctx;
+            var c = chart.ctx;
             var meta = chart.getDatasetMeta(0);
             var data = chart.data.datasets[0].data || [];
-            ctx.save();
-            ctx.fillStyle = '#92400e';
-            ctx.font = '600 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
+            c.save();
+            c.fillStyle = '#92400e';
+            c.font = '600 11px Inter, sans-serif';
+            c.textAlign = 'center';
+            c.textBaseline = 'bottom';
             meta.data.forEach(function(bar, i) {
               var v = data[i];
               if (v === null || typeof v === 'undefined') return;
-              ctx.fillText(Number(v).toFixed(3), bar.x, bar.y - 4);
+              c.fillText(Number(v).toFixed(3), bar.x, bar.y - 4);
             });
-            ctx.restore();
+            c.restore();
           }
         }],
         data: {
@@ -1578,9 +2150,9 @@
               callbacks: {
                 label: function(ctx) {
                   var key = ctx.label || '';
-                  var estH = toHours(assigneeMap[key].est || 0);
-                  var logH = toHours(assigneeMap[key].log || 0);
-                  var ngayCongAssignee = Object.keys(assigneeWeekdayLogMap[key] || {}).length;
+                  var estH = toHours(_ulnnAssigneeMap[key].est || 0);
+                  var logH = toHours(_ulnnAssigneeMap[key].log || 0);
+                  var ngayCongAssignee = Object.keys(_ulnnAssigneeWeekdayLogMap[key] || {}).length;
                   return 'ULNN: ' + Number(ctx.parsed.y).toFixed(3) + ' | Est: ' + estH + 'h | Log: ' + logH + 'h | Σ Ngày Công: ' + ngayCongAssignee;
                 }
               }
