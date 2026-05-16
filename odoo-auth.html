@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Đăng nhập Jira Dashboard</title>
+  <title>Đăng nhập ETC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -21,6 +21,8 @@
       --accent-b: #3f9eff;
       --focus: rgba(80, 224, 255, 0.8);
       --shadow-main: 0 30px 90px rgba(1, 12, 28, 0.7);
+      --danger: #ff7f93;
+      --ok: #7ff2c5;
     }
 
     * { box-sizing: border-box; }
@@ -148,14 +150,11 @@
       background: linear-gradient(165deg, rgba(6, 16, 31, 0.86), rgba(5, 12, 24, 0.72));
       border-radius: 28px;
       box-shadow: var(--shadow-main);
-    }
-
-    .login-card {
-      padding: 30px;
       position: relative;
       overflow: hidden;
       animation: revealRise 900ms cubic-bezier(.22,.84,.22,1) both;
       animation-delay: 120ms;
+      padding: 30px;
     }
 
     .login-card::before {
@@ -211,6 +210,24 @@
       pointer-events: none;
     }
 
+    .status-chip {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--chip-bg);
+      border: 1px solid var(--line-strong);
+      color: #baf4ff;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 7px 12px;
+      animation: revealRise 640ms ease both;
+      animation-delay: 600ms;
+    }
+
     .login-title {
       margin: 4px 0 8px;
       font-family: 'Exo 2', sans-serif;
@@ -230,24 +247,6 @@
       animation-delay: 520ms;
     }
 
-    .status-chip {
-      margin-top: 18px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--chip-bg);
-      border: 1px solid var(--line-strong);
-      color: #baf4ff;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      padding: 7px 12px;
-      animation: revealRise 640ms ease both;
-      animation-delay: 600ms;
-    }
-
     .login-action {
       margin-top: 26px;
       animation: revealRise 700ms ease both;
@@ -256,7 +255,39 @@
       gap: 12px;
     }
 
-    .google-btn {
+    .login-form {
+      display: grid;
+      gap: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(136, 190, 255, 0.18);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+      padding: 14px 14px;
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+      font: inherit;
+    }
+
+    input:focus {
+      border-color: rgba(102, 207, 255, 0.64);
+      box-shadow: 0 0 0 4px rgba(83, 195, 255, 0.12);
+    }
+
+    .btn {
       width: 100%;
       border: 0;
       border-radius: 14px;
@@ -276,9 +307,10 @@
       transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
       position: relative;
       overflow: hidden;
+      cursor: pointer;
     }
 
-    .google-btn::before {
+    .btn::before {
       content: '';
       position: absolute;
       inset: 0;
@@ -287,85 +319,45 @@
       transition: transform 360ms ease;
     }
 
-    .google-btn:hover {
+    .btn:hover {
       transform: translateY(-2px);
       filter: brightness(1.05);
       box-shadow: 0 18px 34px rgba(21, 151, 235, 0.45);
     }
 
-    .google-btn:hover::before {
+    .btn:hover::before {
       transform: translateX(120%);
     }
 
-    .odoo-btn {
-      width: 100%;
-      border: 1px solid rgba(140, 216, 255, 0.2);
-      border-radius: 14px;
-      padding: 14px 18px;
-      font-family: 'Manrope', sans-serif;
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-      color: #eaf9ff;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: linear-gradient(95deg, rgba(9, 24, 46, 0.94) 0%, rgba(18, 39, 77, 0.9) 100%);
-      box-shadow: 0 12px 30px rgba(4, 16, 35, 0.34);
-      transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, border-color 180ms ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .odoo-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(120deg, transparent 20%, rgba(121, 236, 255, 0.16) 48%, transparent 72%);
-      transform: translateX(-120%);
-      transition: transform 360ms ease;
-    }
-
-    .odoo-btn:hover {
-      transform: translateY(-2px);
-      filter: brightness(1.06);
-      border-color: rgba(140, 216, 255, 0.4);
-      box-shadow: 0 18px 34px rgba(10, 28, 57, 0.52);
-    }
-
-    .odoo-btn:hover::before {
-      transform: translateX(120%);
-    }
-
-    .odoo-btn:active {
+    .btn:active {
       transform: translateY(0);
     }
 
-    .odoo-btn:focus-visible {
-      outline: 2px solid var(--focus);
-      outline-offset: 3px;
-      box-shadow: 0 0 0 6px rgba(100, 214, 255, 0.18);
-    }
-
-    .google-btn:active {
-      transform: translateY(0);
-    }
-
-    .google-btn:focus-visible {
+    .btn:focus-visible {
       outline: 2px solid var(--focus);
       outline-offset: 3px;
       box-shadow: 0 0 0 6px rgba(100, 214, 255, 0.22);
     }
 
-    .shield-note {
-      margin-top: 13px;
+    .status {
+      min-height: 22px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+
+    .note {
+      margin-top: 6px;
       color: #89a3be;
       font-size: 12px;
       line-height: 1.5;
-      animation: revealRise 640ms ease both;
-      animation-delay: 760ms;
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     @keyframes revealRise {
@@ -396,11 +388,6 @@
       100% { transform: translate(-50%, -50%) rotate(360deg); }
     }
 
-    @keyframes blink {
-      0%, 100% { opacity: 0.6; }
-      50% { opacity: 1; }
-    }
-
     @keyframes cinematicGlow {
       0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.5; }
       100% { transform: translate3d(-10px, -22px, 0) scale(1.08); opacity: 0.8; }
@@ -409,12 +396,6 @@
     @keyframes cinematicGlowSecondary {
       0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.45; }
       100% { transform: translate3d(14px, -18px, 0) scale(1.12); opacity: 0.75; }
-    }
-
-    @media (max-width: 980px) {
-      .login-card {
-        padding: 24px;
-      }
     }
 
     @media (max-width: 640px) {
@@ -454,43 +435,263 @@
   <div class="bg-layer beam"></div>
   <div class="bg-layer scanline noise"></div>
 
-  <main class="login-shell" aria-label="Đăng nhập hệ thống Jira Dashboard">
+  <main class="login-shell" aria-label="Đăng nhập SSO">
     <section class="login-card">
       <div class="radar-ring" aria-hidden="true"></div>
       <p class="status-chip">Secure Channel Established</p>
-      <h2 class="login-title">Đăng nhập</h2>
+      <h2 class="login-title">Đăng nhập SSO</h2>
       <p class="login-subtitle">
-        Chọn Google để vào dashboard Jira hoặc SSO để đăng nhập bằng account và password.
+        Nhập account và password theo tài khoản ETC.
       </p>
 
       <div class="login-action">
-        <a id="loginBtn" href="/api/auth/login" class="google-btn" aria-label="Đăng nhập bằng Google">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M21.35 12.2c0-.73-.06-1.26-.19-1.81H12v3.52h5.38c-.11.88-.71 2.21-2.05 3.11l-.02.12 2.97 2.3.2.02c1.83-1.69 2.87-4.17 2.87-7.26z" fill="#f2f7ff"/>
-            <path d="M12 21.75c2.63 0 4.84-.87 6.45-2.35l-3.07-2.38c-.82.58-1.93.98-3.38.98-2.57 0-4.74-1.69-5.52-4.03l-.11.01-3.08 2.39-.03.11C5.06 19.87 8.27 21.75 12 21.75z" fill="#f2f7ff"/>
-            <path d="M6.48 13.97A5.77 5.77 0 016.16 12c0-.68.12-1.34.31-1.97l-.01-.13-3.12-2.42-.1.05A9.75 9.75 0 002.25 12c0 1.57.38 3.06 1.08 4.37l3.15-2.4z" fill="#f2f7ff"/>
-            <path d="M12 6c1.85 0 3.1.8 3.8 1.47l2.78-2.72C16.83 3.15 14.63 2.25 12 2.25c-3.73 0-6.94 1.88-8.67 4.72l3.23 2.5C7.26 7.69 9.43 6 12 6z" fill="#f2f7ff"/>
-          </svg>
-          Đăng nhập với Google
-        </a>
-        <a id="odooLoginBtn" href="odoo-auth.html" class="odoo-btn" aria-label="Đăng nhập Odoo">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M7 6.5h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 18.5H7A2.5 2.5 0 0 1 4.5 16V9A2.5 2.5 0 0 1 7 6.5Zm0 2A.5.5 0 0 0 6.5 9v7a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5V9a.5.5 0 0 0-.5-.5H7Z" fill="#d9f7ff"/>
-            <path d="M8.5 10h7v1.5h-7V10Zm0 3h4.5v1.5H8.5V13Z" fill="#d9f7ff"/>
-          </svg>
-          Đăng nhập SSO
-        </a>
-        <p class="shield-note">
-          Với Google, chỉ tài khoản đã được cấp quyền mới truy cập được.
-        </p>
+        <form id="loginForm" class="login-form">
+          <div id="loginStep">
+            <div>
+              <label for="account">Account</label>
+              <input id="account" name="account" type="email" placeholder="user@etc.vn" autocomplete="username" required />
+            </div>
+            <div>
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+
+            <input id="deviceId" name="device_id" type="hidden" />
+            <input id="platformType" name="platform_type" type="hidden" value="android" />
+
+            <button id="loginBtn" class="btn" type="submit">Đăng nhập SSO</button>
+            <div class="note">Chỉ hỗ trợ tài khoản ETC</div>
+          </div>
+
+          <div id="otpForm" class="hidden">
+            <div>
+              <label for="otpCode">Mã OTP</label>
+              <input id="otpCode" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6" />
+            </div>
+
+            <button id="otpBtn" class="btn" type="submit">Xác thực OTP</button>
+            <button id="backBtn" class="btn" type="button" style="margin-top: 10px; background: linear-gradient(95deg, rgba(57, 74, 100, 0.95) 0%, rgba(27, 41, 66, 0.95) 100%); box-shadow: none;">Quay lại</button>
+            <div class="note">Sử dụng OTP eGen để xác thực.</div>
+          </div>
+
+          <div id="status" class="status"></div>
+        </form>
       </div>
     </section>
   </main>
 
   <script>
-    const q = new URLSearchParams(window.location.search);
-    const next = q.get('next') || '/';
-    document.getElementById('loginBtn').href = '/api/auth/login?next=' + encodeURIComponent(next);
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const otpBtn = document.getElementById('otpBtn');
+    const otpCode = document.getElementById('otpCode');
+    const backBtn = document.getElementById('backBtn');
+    const statusEl = document.getElementById('status');
+    const deviceIdInput = document.getElementById('deviceId');
+    const platformTypeInput = document.getElementById('platformType');
+    const loginStep = document.getElementById('loginStep');
+    const otpStep = document.getElementById('otpForm');
+    const accountInput = document.getElementById('account');
+    const passwordInput = document.getElementById('password');
+    let pendingTwoFactor = false;
+
+    function setStatus(message, type) {
+      statusEl.textContent = message || '';
+      statusEl.className = type ? `status ${type}` : 'status';
+    }
+
+    function getCompanyType(account) {
+      const value = String(account || '').trim().toLowerCase();
+      const atIndex = value.lastIndexOf('@');
+      const domain = atIndex >= 0 ? value.slice(atIndex + 1) : '';
+      if (domain === 'etc.vn' || domain.endsWith('.etc.vn')) {
+        return 'etc.vn';
+      }
+      // if (domain === 'epayjsc.com' || domain.endsWith('.epayjsc.com')) {
+      //   return 'epayjsc.com';
+      // }
+      return '';
+    }
+
+    function isBusinessAccount(account) {
+      return Boolean(getCompanyType(account));
+    }
+
+    function showOtpStep(message) {
+      pendingTwoFactor = true;
+      if (loginStep) loginStep.classList.add('hidden');
+      if (otpStep) otpStep.classList.remove('hidden');
+      loginBtn.disabled = false;
+      otpBtn.disabled = false;
+      if (message) {
+        setStatus(message, '');
+      }
+      window.setTimeout(() => otpCode.focus(), 0);
+    }
+
+    function showLoginStep(message) {
+      pendingTwoFactor = false;
+      if (otpStep) otpStep.classList.add('hidden');
+      if (loginStep) loginStep.classList.remove('hidden');
+      if (message) {
+        setStatus(message, '');
+      }
+      window.setTimeout(() => accountInput.focus(), 0);
+    }
+
+    function getOrCreateDeviceId() {
+      const storageKey = 'odoo_device_id';
+      try {
+        const stored = window.localStorage.getItem(storageKey);
+        if (stored) return stored;
+      } catch (error) {
+        // Ignore storage failures and fall back to an in-memory ID.
+      }
+
+      const randomPart = window.crypto && typeof window.crypto.randomUUID === 'function'
+        ? window.crypto.randomUUID().slice(0, 8)
+        : Math.random().toString(36).slice(2, 10);
+      const deviceId = `web-${randomPart}`;
+
+      try {
+        window.localStorage.setItem(storageKey, deviceId);
+      } catch (error) {
+        // Ignore storage failures; the generated ID still works for this session.
+      }
+
+      return deviceId;
+    }
+
+    async function readJson(response) {
+      const text = await response.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch (error) {
+        return { ok: false, message: text || error.message };
+      }
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (pendingTwoFactor) {
+        otpBtn.disabled = true;
+        setStatus('Đang xác thực OTP...', '');
+        try {
+          let pendingToken = '';
+          try {
+            pendingToken = window.sessionStorage.getItem('odoo_pending_token') || '';
+          } catch (error) {
+            pendingToken = '';
+          }
+          const response = await fetch('/api/odoo/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              otp: otpCode.value.trim(),
+              pending_token: pendingToken
+            })
+          });
+          const data = await readJson(response);
+
+          if (!response.ok || !data.ok) {
+            setStatus(data.message || 'Xác thực OTP thất bại.', 'error');
+            return;
+          }
+
+          try {
+            window.sessionStorage.removeItem('odoo_pending_token');
+            window.sessionStorage.setItem('odoo_session_token', data.token || '');
+          } catch (error) {
+            // Ignore storage failures.
+          }
+          setStatus('Đăng nhập thành công. Đang chuyển sang dashboard...', 'ok');
+          window.setTimeout(() => {
+            var redirectUrl = 'jira-dashboard.html';
+            if (window.location.protocol === 'file:') {
+              var fileRedirect = new URL(redirectUrl, window.location.href);
+              fileRedirect.hash = 'odoo_token=' + encodeURIComponent(data.token || '');
+              window.location.href = fileRedirect.toString();
+              return;
+            }
+            window.location.href = redirectUrl;
+          }, 180);
+        } catch (error) {
+          setStatus(error.message || 'Không thể gọi API xác thực OTP.', 'error');
+        } finally {
+          otpBtn.disabled = false;
+        }
+        return;
+      }
+
+      loginBtn.disabled = true;
+      setStatus('Đang đăng nhập SSO...', '');
+
+      const formData = new FormData(loginForm);
+      const payload = Object.fromEntries(formData.entries());
+      payload.platform_type = 'android';
+      payload.type = 'android';
+      payload.device_id = deviceIdInput.value || getOrCreateDeviceId();
+      payload.company_type = getCompanyType(payload.account);
+
+      if (!isBusinessAccount(payload.account)) {
+        setStatus('SSO Login chỉ hỗ trợ tài khoản `@etc.vn`.', 'error');
+        loginBtn.disabled = false;
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/odoo/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const data = await readJson(response);
+
+        if (!response.ok || !data.ok) {
+          setStatus(data.message || 'Đăng nhập thất bại.', 'error');
+          return;
+        }
+
+        if (data.requiresTwoFactor) {
+          if (data.pendingToken) {
+            try {
+              window.sessionStorage.setItem('odoo_pending_token', data.pendingToken);
+            } catch (error) {
+              // Ignore storage failures and continue with in-memory state.
+            }
+          }
+          showOtpStep('Đăng nhập bước 1 thành công. Vui lòng nhập mã OTP.');
+          return;
+        }
+
+        setStatus('Đăng nhập thành công.', 'ok');
+        loginForm.reset();
+        deviceIdInput.value = payload.device_id;
+        platformTypeInput.value = 'android';
+        passwordInput.focus();
+      } catch (error) {
+        setStatus(error.message || 'Không thể gọi API đăng nhập.', 'error');
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+
+    backBtn.addEventListener('click', () => {
+      otpCode.value = '';
+      try {
+        window.sessionStorage.removeItem('odoo_pending_token');
+        window.sessionStorage.removeItem('odoo_session_token');
+      } catch (error) {
+        // Ignore storage failures.
+      }
+      showLoginStep('Bạn có thể nhập lại tài khoản ETC để đăng nhập.');
+    });
+
+    deviceIdInput.value = getOrCreateDeviceId();
+    platformTypeInput.value = 'android';
+    showLoginStep();
 
     const canvas = document.getElementById('networkCanvas');
     const ctx = canvas.getContext('2d');
@@ -584,9 +785,11 @@
 
     resizeNetwork();
     window.addEventListener('resize', resizeNetwork);
-    if (!reducedMotion) {
-      animationFrame = requestAnimationFrame(drawNetwork);
-    }
+    window.addEventListener('beforeunload', () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    });
   </script>
 </body>
 </html>
