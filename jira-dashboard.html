@@ -320,6 +320,7 @@
     let modalUlnnChart = null;
     let odooSessionProfile = null;
     let odooOverTimeHours = 0;
+    let odooLeaveHours = 0;
     let odooHydrationPromise = null;
     const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
 
@@ -332,8 +333,8 @@
         try { initDailyUserAutocomplete(); } catch(e) { console.error('daily user init error', e); }
         try { initUlnnUserAutocomplete(); } catch(e) { console.error('ulnn user init error', e); }
         try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
+        try { await hydrateOdooSession(); } catch(e) { console.error('odoo session init error', e); }
         try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
-        try { hydrateOdooSession(); } catch(e) { console.error('odoo session init error', e); }
         try { await loadData(); } catch(e) { console.error('loadData error', e); }
       }
       setTimeout(safeInit, 300);
@@ -1255,7 +1256,7 @@
               var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
               var estH = (monthObj.estClosed || 0) / 3600;
               var otHours = getUlnnOtValue(uid, monthKey);
-              return estH > 0 ? Number(((worklogDays * 7 + otHours) / estH).toFixed(3)) : 0;
+              return estH > 0 ? Number(((worklogDays * 7 + otHours) / estH + otHours).toFixed(3)) : 0;
             }),
             backgroundColor: monthColors[mIdx].bg,
             borderColor: monthColors[mIdx].border,
@@ -1429,9 +1430,25 @@
       loadData();
     }
 
+    function resolveDefaultAssigneeQuery() {
+      var profile = odooSessionProfile || {};
+      var candidates = [
+        profile.login,
+        profile.email,
+        DEFAULT_ASSIGNEE_QUERY
+      ];
+
+      for (var i = 0; i < candidates.length; i++) {
+        var value = String(candidates[i] || '').trim();
+        if (value) return value;
+      }
+
+      return DEFAULT_ASSIGNEE_QUERY;
+    }
+
     async function applyDefaultAssignee() {
       if (selectedAssignees.length > 0) return;
-      var query = DEFAULT_ASSIGNEE_QUERY;
+      var query = resolveDefaultAssigneeQuery();
       await fetchUserList(query);
       if (!cachedUsers || cachedUsers.length === 0) return;
 
@@ -2033,8 +2050,11 @@
       var odooLoginLabel = odooSessionProfile && odooSessionProfile.login
         ? String(odooSessionProfile.login)
         : '';
+      var odooLeaveLabel = odooLeaveHours !== null && odooLeaveHours !== undefined
+        ? odooLeaveHours / 8 + 'd'
+        : '-';
       var odooHoursSub = odooSessionProfile
-        ? 'Từ eGen' + (odooLoginLabel ? ' · ' + odooLoginLabel : '') + ' · ' + odooHoursLabel
+        ? 'Từ eGen' + (odooLoginLabel ? ' · ' + odooLoginLabel : '') + ' · ' + odooHoursLabel + ' OT' + ' | ' + odooLeaveLabel + ' nghỉ phép'
         : 'Đang chờ đồng bộ eGen';
 
       return [
@@ -2102,12 +2122,16 @@
             : (((data.profile || {}).stats || {}).totalOverTime);
           var overTimeNumber = Number(overTimeRaw);
           odooOverTimeHours = Number.isFinite(overTimeNumber) ? overTimeNumber : null;
+          var leaveDaysRaw = (((data.profile || {}).stats || {}).totalLeaveRequest);
+          var leaveDaysNumber = Number(leaveDaysRaw);
+          odooLeaveHours = Number.isFinite(leaveDaysNumber) ? leaveDaysNumber * 8 : null;
           renderStatCards();
           return data.profile || null;
         } catch (error) {
           console.warn('[ODOO] hydrate session failed', error);
           odooSessionProfile = null;
           odooOverTimeHours = null;
+          odooLeaveHours = null;
           renderStatCards();
           return null;
         }
@@ -2505,7 +2529,9 @@
         var estHours = (ulnnAssigneeMap[k].est || 0) / 3600;
         var ngayCongAssignee = Object.keys(ulnnAssigneeWeekdayLogMap[k] || {}).length;
         var overtimeHours = isLoggedInOdooAccount(k) ? Number(odooOverTimeHours || 0) : 0;
-        return estHours > 0 ? +((ngayCongAssignee * 7 + overtimeHours) / estHours).toFixed(3) : 0;
+        var leaveHours = isLoggedInOdooAccount(k) ? Number(odooLeaveHours || 0) : 0;
+        var numerator = Math.max(0, (ngayCongAssignee * 7) + overtimeHours - leaveHours);
+        return estHours > 0 ? +(numerator / estHours + overtimeHours).toFixed(3) : 0;
       });
 
       if (dashboardUlnnChart) dashboardUlnnChart.destroy();
@@ -2558,11 +2584,15 @@
                   var odooHoursText = isLoggedInOdooAccount(key) && odooOverTimeHours !== null && odooOverTimeHours !== undefined
                     ? formatOdooHours(odooOverTimeHours) + ' h'
                     : '0 h';
+                  var odooLeaveText = isLoggedInOdooAccount(key) && odooLeaveHours !== null && odooLeaveHours !== undefined
+                    ? odooLeaveHours / 8 + ' d'
+                    : '0 d';
                   return [
                     'ULNN: ' + Number(ctx.parsed.y).toFixed(3),
                     'Est: ' + estH + ' h',
                     'LogWork: ' + logH + ' h',
                     'OT: ' + odooHoursText,
+                    'Nghỉ phép: ' + odooLeaveText,
                     'Σ Ngày Công: ' + ngayCongAssignee + ' d'
                   ];
                 }

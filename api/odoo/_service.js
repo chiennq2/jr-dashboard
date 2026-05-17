@@ -181,11 +181,11 @@ async function callUpstreamLogin(config, credentials) {
   });
 
   const rawText = await response.text();
-  console.log('[ODOO] login upstream response', {
-    status: response.status,
-    ok: response.ok,
-    body: rawText
-  });
+  // console.log('[ODOO] login upstream response', {
+  //   status: response.status,
+  //   ok: response.ok,
+  //   body: rawText
+  // });
   if (!response.ok) {
     throw createOdooError(
       'ODOO_LOGIN_FAILED',
