@@ -4,10 +4,11 @@ const fs = require('fs');
 const path = require('path');
 
 const { encryptAes256Cbc, decryptAes256Cbc } = require('../api/odoo/_crypto');
-const { normalizeProfile, callUpstreamLogin, callUpstreamMe } = require('../api/odoo/_service');
+const { normalizeProfile, normalizeAttendanceRecord, callUpstreamLogin, callUpstreamMe, callUpstreamAttendances } = require('../api/odoo/_service');
 const loginHandler = require('../api/odoo/login');
 const verifyOtpHandler = require('../api/odoo/verify-otp');
 const meHandler = require('../api/odoo/me');
+const attendanceHandler = require('../api/odoo/attendance');
 const logoutHandler = require('../api/odoo/logout');
 const { DEFAULT_SESSION_AGE_SECONDS } = require('../api/odoo/_config');
 const { getEncryptedCookie } = require('../api/odoo/_cookies');
@@ -184,6 +185,42 @@ test('normalizeProfile maps upstream profile fields into a stable shape', () => 
   assert.equal(profile.flags.itConfirm, true);
 });
 
+test('normalizeAttendanceRecord extracts month, OT, and leave hours from attendance details', () => {
+  const attendance = normalizeAttendanceRecord({
+    id: 101,
+    name: 'Tháng 01,2025',
+    employee_code: 'EMP001',
+    employee_id: { id: 22, name: 'Nguyen Van A' },
+    total_working_days: '22',
+    total_worked_days: '20',
+    details: [
+      {
+        category: '1. Giảm trừ ngày công',
+        value: '2 ngày',
+        items: [
+          { label: 'Nghỉ phép năm', value: '1 ngày' },
+          { label: 'Nghỉ không phép', value: '1 ngày' }
+        ]
+      },
+      {
+        category: '2. Số giờ công việc phát sinh',
+        value: '4h',
+        items: [
+          { label: 'Ca tối', value: '2h' },
+          { label: 'Ca sáng', value: '2h' }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(attendance.year, 2025);
+  assert.equal(attendance.month, 1);
+  assert.equal(attendance.monthKey, '2025-01');
+  assert.equal(attendance.otHours, 4);
+  assert.equal(attendance.leaveDays, 2);
+  assert.equal(attendance.leaveHours, 16);
+});
+
 test('callUpstreamLogin and callUpstreamMe decode upstream encrypted envelopes', async () => {
   setOdooEnv();
   const tokenPayload = { id: 12, token: 'encrypted-token' };
@@ -216,6 +253,47 @@ test('callUpstreamLogin and callUpstreamMe decode upstream encrypted envelopes',
     const meResult = await callUpstreamMe(config, loginResult.token);
     assert.equal(meResult.normalizedProfile.email, 'test@example.com');
   });
+});
+
+test('callUpstreamAttendances decodes yearly attendance records into normalized month data', async () => {
+  setOdooEnv();
+  const requests = [];
+  const attendancePayload = [
+    {
+      id: 501,
+      name: 'Tháng 12,2025',
+      employee_code: 'EMP001',
+      employee_id: { id: 1, name: 'Nguyen Van A' },
+      total_working_days: '22',
+      total_worked_days: '21',
+      details: [
+        { category: '1. Giảm trừ ngày công', value: '1 ngày' },
+        { category: '2. Số giờ công việc phát sinh', value: '6h' }
+      ]
+    }
+  ];
+
+  await withMockFetch([
+    makeResponse(200, makeResultEnvelope({
+      status: 200,
+      msg: 'Success',
+      data: JSON.stringify(attendancePayload)
+    }))
+  ], async () => {
+    const config = { apiBase: TEST_BASE_URL, authSecret: TEST_SECRET };
+    const result = await callUpstreamAttendances(config, 'encrypted-token', 2025);
+    assert.equal(result.year, 2025);
+    assert.equal(result.records.length, 1);
+    assert.equal(result.records[0].monthKey, '2025-12');
+    assert.equal(result.records[0].leaveHours, 8);
+    assert.equal(result.records[0].otHours, 6);
+  }, requests);
+
+  assert.equal(requests.length, 1);
+  const [url, options] = requests[0];
+  assert.equal(url, `${TEST_BASE_URL}/api/v1/hr-payroll/attendances?year=2025-01-01`);
+  assert.equal(options.method, 'GET');
+  assert.equal(options.headers.Authorization, 'Bearer encrypted-token');
 });
 
 test('callUpstreamLogin sends the encrypted login payload as a raw form body', async () => {
@@ -456,6 +534,50 @@ test('GET /api/odoo/me accepts the final token from an Authorization header', as
   assert.equal(payload.profile.email, 'user@etc.vn');
 });
 
+test('GET /api/odoo/attendance returns normalized monthly attendance records for the current session', async () => {
+  setOdooEnv();
+  const bearerToken = encryptAes256Cbc('final-business-token', TEST_SECRET);
+  const res = createMockRes();
+
+  await withMockFetch([
+    makeResponse(200, makeResultEnvelope({
+      status: 200,
+      msg: 'Success',
+      data: JSON.stringify([
+        {
+          id: 61,
+          name: 'Tháng 01,2026',
+          employee_code: 'EMP001',
+          employee_id: { id: 7, name: 'Nguyen Van A' },
+          total_working_days: '22',
+          total_worked_days: '20',
+          details: [
+            { category: '1. Giảm trừ ngày công', value: '2 ngày' },
+            { category: '2. Số giờ công việc phát sinh', value: '4h' }
+          ]
+        }
+      ])
+    }))
+  ], async () => {
+    await attendanceHandler(
+      {
+        url: '/api/odoo/attendance?year=2026',
+        body: {},
+        headers: { authorization: `Bearer ${bearerToken}` }
+      },
+      res
+    );
+  });
+
+  assert.equal(res.statusCode, 200);
+  const payload = JSON.parse(res.body);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.year, 2026);
+  assert.equal(payload.records[0].monthKey, '2026-01');
+  assert.equal(payload.records[0].leaveHours, 16);
+  assert.equal(payload.records[0].otHours, 4);
+});
+
 test('POST /api/odoo/logout clears only the Odoo cookie', async () => {
   setOdooEnv();
   const res = createMockRes();
@@ -497,6 +619,44 @@ test('local jira-server dispatches /api/odoo/login instead of returning 404', as
   assert.equal(res.headers['Access-Control-Allow-Credentials'], 'true');
   assert.match(String(res.headers['Access-Control-Allow-Methods']), /POST/);
   assert.match(String(res.body), /"requiresTwoFactor":true/);
+});
+
+test('local jira-server dispatches /api/odoo/attendance instead of returning 404', async () => {
+  setOdooEnv();
+  const req = createMockReq({});
+  req.method = 'GET';
+  req.url = '/api/odoo/attendance?year=2026';
+  req.headers.authorization = `Bearer ${encryptAes256Cbc('final-business-token', TEST_SECRET)}`;
+  req.headers.origin = 'http://localhost:3456';
+  const res = createMockRes();
+
+  await withMockFetch([
+    makeResponse(200, makeResultEnvelope({
+      status: 200,
+      msg: 'Success',
+      data: JSON.stringify([
+        {
+          id: 91,
+          name: 'Tháng 02,2026',
+          employee_code: 'EMP002',
+          employee_id: { id: 8, name: 'Le Thi B' },
+          total_working_days: '20',
+          total_worked_days: '19',
+          details: [
+            { category: '1. Giảm trừ ngày công', value: '1 ngày' },
+            { category: '2. Số giờ công việc phát sinh', value: '2h' }
+          ]
+        }
+      ])
+    }))
+  ], async () => {
+    await handleRequest(req, res);
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Access-Control-Allow-Credentials'], 'true');
+  assert.match(String(res.body), /"year":2026/);
+  assert.match(String(res.body), /"monthKey":"2026-02"/);
 });
 
 test('local jira-server answers Odoo preflight with POST allowed', async () => {
@@ -554,7 +714,8 @@ test('ULNN modal smoke checks the OT-by-month table wiring', () => {
   assert.match(html, /renderUlnnOtSection/);
   assert.match(html, /getUlnnOtValue/);
   assert.match(html, /ulnnModalBaseState/);
-  assert.match(html, /worklogDays \* 7 \+ otHours/);
+  assert.match(html, /worklogDays \* 7/);
+  assert.match(html, /leaveHours/);
 });
 
 test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () => {
@@ -563,6 +724,7 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /odoo_session_token/);
   assert.match(html, /consumeOdooSessionTokenFromHash/);
   assert.match(html, /\/api\/odoo\/me/);
+  assert.match(html, /\/api\/odoo\/attendance/);
   assert.match(html, /Authorization: 'Bearer ' \+ token/);
   assert.match(html, /hydrateOdooSession/);
   assert.match(html, /resolveDefaultAssigneeQuery/);
@@ -570,12 +732,20 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /profile\.email/);
   assert.match(html, /totalLeaveRequest/);
   assert.match(html, /odooLeaveHours/);
+  assert.match(html, /ULNN_OT_TOUCHED_STORAGE_KEY/);
+  assert.match(html, /hydrateUlnnAttendanceDefaults/);
+  assert.match(html, /getResolvedUlnnOtValue/);
+  assert.match(html, /getResolvedUlnnLeaveHours/);
+  assert.match(html, /Number\(storedValue\) !== 0/);
+  assert.match(html, /markUlnnOtTouched/);
+  assert.match(html, /attendanceDefaultsPromise/);
+  assert.match(html, /var numerator = Math\.max\(0, \(worklogDays \* 7\) \+ otHours - leaveHours\);/);
+  assert.match(html, /monthKeyLabel/);
+  assert.match(html, /OT \('/);
+  assert.match(html, /Nghỉ phép \('/);
   assert.match(html, /DEFAULT_ASSIGNEE_QUERY/);
   assert.match(html, /renderStatCards/);
-  assert.match(html, /var leaveHours = isLoggedInOdooAccount\(k\) \? Number\(odooLeaveHours \|\| 0\) : 0;/);
-  assert.match(html, /var numerator = Math\.max\(0, \(ngayCongAssignee \* 7\) \+ overtimeHours - leaveHours\);/);
   assert.match(html, /isLoggedInOdooAccount\(key\) && odooOverTimeHours !== null && odooOverTimeHours !== undefined/);
-  assert.match(html, /Nghỉ phép: ' \+ odooLeaveText/);
   assert.ok(
     html.indexOf('await hydrateOdooSession();') > -1 &&
     html.indexOf('await applyDefaultAssignee();') > -1 &&

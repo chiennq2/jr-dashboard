@@ -134,6 +134,183 @@ function normalizeProfile(profile) {
   };
 }
 
+function parseAttendanceNumber(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return NaN;
+  }
+
+  const match = raw.match(/-?\d+(?:[.,]\d+)?/);
+  if (!match) {
+    return NaN;
+  }
+
+  return Number(match[0].replace(',', '.'));
+}
+
+function getAttendanceNodeText(node) {
+  if (!node || typeof node !== 'object') {
+    return '';
+  }
+
+  return String(node.category || node.label || node.name || '').trim();
+}
+
+function findAttendanceNode(nodes, predicate) {
+  const stack = Array.isArray(nodes) ? nodes.slice() : [];
+  while (stack.length) {
+    const node = stack.shift();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+
+    if (predicate(node)) {
+      return node;
+    }
+
+    if (Array.isArray(node.items) && node.items.length) {
+      stack.unshift(...node.items);
+    }
+
+    if (Array.isArray(node.children) && node.children.length) {
+      stack.unshift(...node.children);
+    }
+  }
+
+  return null;
+}
+
+function sumAttendanceNodeValues(node) {
+  if (!node || typeof node !== 'object') {
+    return NaN;
+  }
+
+  let total = 0;
+  let hasValue = false;
+
+  const directValue = parseAttendanceNumber(node.value);
+  if (Number.isFinite(directValue)) {
+    return directValue;
+  }
+
+  const children = [];
+  if (Array.isArray(node.items)) {
+    children.push(...node.items);
+  }
+  if (Array.isArray(node.children)) {
+    children.push(...node.children);
+  }
+
+  children.forEach((child) => {
+    const childValue = sumAttendanceNodeValues(child);
+    if (Number.isFinite(childValue)) {
+      total += childValue;
+      hasValue = true;
+    }
+  });
+
+  return hasValue ? total : NaN;
+}
+
+function extractAttendanceMetric(details, predicate) {
+  const node = findAttendanceNode(details, predicate);
+  if (!node) {
+    return NaN;
+  }
+
+  const directValue = parseAttendanceNumber(node.value);
+  if (Number.isFinite(directValue)) {
+    return directValue;
+  }
+
+  return sumAttendanceNodeValues(node);
+}
+
+function parseAttendanceMonthInfo(name) {
+  const raw = String(name || '').trim();
+  if (!raw) {
+    return { year: null, month: null, monthKey: '' };
+  }
+
+  const match = raw.match(/Tháng\s*(\d{1,2})\s*,\s*(\d{4})/i) || raw.match(/(\d{1,2})[\/\-](\d{4})/);
+  if (!match) {
+    return { year: null, month: null, monthKey: '' };
+  }
+
+  const month = Number(match[1]);
+  const year = Number(match[2]);
+  if (!Number.isFinite(month) || !Number.isFinite(year)) {
+    return { year: null, month: null, monthKey: '' };
+  }
+
+  return {
+    year,
+    month,
+    monthKey: `${year}-${String(month).padStart(2, '0')}`
+  };
+}
+
+function normalizeAttendanceYearParam(year) {
+  const raw = String(year || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  if (/^\d{4}$/.test(raw)) {
+    return `${raw}-01-01`;
+  }
+
+  return raw;
+}
+
+function normalizeAttendanceRecord(record) {
+  const info = record || {};
+  const details = Array.isArray(info.details) ? info.details : [];
+  const monthInfo = parseAttendanceMonthInfo(info.name);
+  const totalWorkingDays = parseAttendanceNumber(info.total_working_days);
+  const totalWorkedDays = parseAttendanceNumber(info.total_worked_days);
+
+  const leaveDaysFromDetails = extractAttendanceMetric(details, (node) => {
+    const text = getAttendanceNodeText(node).toLowerCase();
+    return text.includes('giảm trừ ngày công') || text.includes('nghỉ phép');
+  });
+
+  const otHoursFromDetails = extractAttendanceMetric(details, (node) => {
+    const text = getAttendanceNodeText(node).toLowerCase();
+    return text.includes('số giờ công việc phát sinh') || text === 'ot' || text.includes('ot');
+  });
+
+  const leaveDaysFallback = Number.isFinite(totalWorkingDays) && Number.isFinite(totalWorkedDays)
+    ? Math.max(0, totalWorkingDays - totalWorkedDays)
+    : 0;
+  const leaveDays = Number.isFinite(leaveDaysFromDetails) ? Math.max(0, leaveDaysFromDetails) : leaveDaysFallback;
+  const otHours = Number.isFinite(otHoursFromDetails) ? Math.max(0, otHoursFromDetails) : 0;
+
+  return {
+    id: info.id ?? null,
+    employeeCode: info.employee_code || '',
+    employeeId: info.employee_id || null,
+    name: info.name || '',
+    year: monthInfo.year,
+    month: monthInfo.month,
+    monthKey: monthInfo.monthKey,
+    totalWorkingDays: Number.isFinite(totalWorkingDays) ? totalWorkingDays : 0,
+    totalWorkedDays: Number.isFinite(totalWorkedDays) ? totalWorkedDays : 0,
+    otHours: Number(otHours.toFixed(3)),
+    leaveDays: Number(leaveDays.toFixed(3)),
+    leaveHours: Number((leaveDays * 8).toFixed(3)),
+    details
+  };
+}
+
 async function readRequestBody(req) {
   if (req && typeof req.body === 'object' && req.body !== null) {
     return req.body;
@@ -302,6 +479,47 @@ async function callUpstreamMe(config, token) {
   };
 }
 
+async function callUpstreamAttendances(config, token, year) {
+  const requestYear = normalizeAttendanceYearParam(year);
+  if (!requestYear) {
+    throw createOdooError('ODOO_ATTENDANCE_BAD_REQUEST', 'year is required', 400);
+  }
+
+  const response = await fetch(buildOdooUrl(config, `/api/v1/hr-payroll/attendances?year=${encodeURIComponent(requestYear)}`), {
+    method: 'GET',
+    headers: getAuthHeaders(token)
+  });
+
+  const rawText = await response.text();
+  if (!response.ok) {
+    throw createOdooError(
+      'ODOO_ATTENDANCE_FAILED',
+      response.status === 401 || response.status === 403 ? 'Odoo attendance session expired' : 'Odoo attendance request failed',
+      response.status === 401 || response.status === 403 ? 401 : 502,
+      { upstreamStatus: response.status, raw: rawText }
+    );
+  }
+
+  const result = decodeUpstreamEnvelope(rawText, config.authSecret);
+  if (result.error || result.status !== 200) {
+    throw createOdooError(
+      'ODOO_ATTENDANCE_FAILED',
+      getUpstreamFailureMessage(result, 'Odoo attendance request failed'),
+      502,
+      { upstreamEnvelope: result }
+    );
+  }
+
+  const data = parseUpstreamData(result);
+  const records = Array.isArray(data) ? data : [];
+
+  return {
+    result,
+    year: Number(String(requestYear).slice(0, 4)),
+    records: records.map(normalizeAttendanceRecord)
+  };
+}
+
 module.exports = {
   createOdooError,
   safeJsonParse,
@@ -314,5 +532,10 @@ module.exports = {
   getUpstreamFailureMessage,
   callUpstreamLogin,
   callUpstreamVerifyOtp,
-  callUpstreamMe
+  callUpstreamMe,
+  callUpstreamAttendances,
+  parseAttendanceNumber,
+  parseAttendanceMonthInfo,
+  normalizeAttendanceYearParam,
+  normalizeAttendanceRecord
 };
