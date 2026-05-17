@@ -310,12 +310,18 @@
     let dailyUserFetchTimer = null;
     // ULNN (12 months) state
     const ULNN_OT_STORAGE_KEY = 'jira_dashboard_ulnn_ot_v1';
+    const ULNN_OT_TOUCHED_STORAGE_KEY = 'jira_dashboard_ulnn_ot_touched_v1';
     const ULNN_OT_MONTH_KEYS = ['n', 'n-1', 'n-2'];
     let ulnnSelectedUsers = [];
     let ulnnCachedUsers = null;
     let ulnnUserFetchTimer = null;
     let ulnnModalBaseState = null;
     let ulnnOtState = null;
+    let ulnnOtTouchedState = null;
+    let ulnnAttendanceCacheByYear = {};
+    let ulnnAttendanceFetchPromisesByYear = {};
+    let ulnnAttendanceMonthMap = {};
+    let ulnnAttendanceTokenFingerprint = '';
     let dashboardUlnnChart = null;
     let modalUlnnChart = null;
     let odooSessionProfile = null;
@@ -1008,6 +1014,7 @@
               label: mLabel
             });
           }
+          var attendanceDefaultsPromise = hydrateUlnnAttendanceDefaults(monthRanges);
 
           // Build comprehensive set of selected user identifiers for flexible matching
           // Each user can be identified by accountId, key, username, displayName, email
@@ -1180,6 +1187,12 @@
             });
           }
 
+          try {
+            await attendanceDefaultsPromise;
+          } catch (attendanceError) {
+            console.warn('[ULNN Attendance] preload failed', attendanceError);
+          }
+
           setProgress('Đang vẽ biểu đồ...');
 
           // Build and store base state; actual dataset values are derived from the current OT table
@@ -1195,6 +1208,9 @@
             userIds: userIds,
             map: map,
             monthRanges: monthRanges,
+            monthKeys: monthRanges.map(function(mr) {
+              return mr && mr.startDate ? String(mr.startDate).slice(0, 7) : '';
+            }),
             selectedUsers: ulnnSelectedUsers.map(function(u) {
               return {
                 id: u.id,
@@ -1255,8 +1271,13 @@
               var monthObj = u.months[mIdx];
               var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
               var estH = (monthObj.estClosed || 0) / 3600;
-              var otHours = getUlnnOtValue(uid, monthKey);
-              return estH > 0 ? Number(((worklogDays * 7 + otHours) / estH + otHours).toFixed(3)) : 0;
+              var selectedUser = (baseState.selectedUsers || []).filter(function(user) {
+                return getUlnnUserStorageKey(user) === uid;
+              })[0];
+              var otHours = selectedUser ? getResolvedUlnnOtValue(selectedUser, monthKey) : getUlnnOtValue(uid, monthKey);
+              var leaveHours = selectedUser ? getResolvedUlnnLeaveHours(selectedUser, monthKey) : 0;
+              var numerator = Math.max(0, (worklogDays * 7) + otHours - leaveHours);
+              return estH > 0 ? Number((numerator / (estH + otHours)).toFixed(3)) : 0;
             }),
             backgroundColor: monthColors[mIdx].bg,
             borderColor: monthColors[mIdx].border,
@@ -1318,13 +1339,19 @@
                     var estH = monthObj ? ((monthObj.estClosed || 0) / 3600).toFixed(1) : '0';
                     var mr = _monthRanges[dsIdx];
                     var range = mr ? (mr.startDate + ' → ' + mr.endDate) : '';
-                    var otHours = getUlnnOtValue(uid, getUlnnMonthKey(dsIdx));
+                    var monthKeyLabel = getUlnnMonthKey(dsIdx);
+                    var selectedUser = (baseState.selectedUsers || []).filter(function(user) {
+                      return getUlnnUserStorageKey(user) === uid;
+                    })[0];
+                    var otHours = selectedUser ? getResolvedUlnnOtValue(selectedUser, monthKeyLabel) : getUlnnOtValue(uid, monthKeyLabel);
+                    var leaveHours = selectedUser ? getResolvedUlnnLeaveHours(selectedUser, monthKeyLabel) : 0;
                     var logWorkHours = worklogDays * 7;
                     return [
                       'ULNN: ' + Number(ctx.parsed.y || 0).toFixed(3),
                       'Est: ' + estH + ' h',
                       'LogWork: ' + Number(logWorkHours || 0).toFixed(1) + ' h',
-                      'OT (' + getUlnnMonthKey(dsIdx) + '): ' + formatOdooHours(otHours) + ' h',
+                      'OT (' + monthKeyLabel + '): ' + formatOdooHours(otHours) + ' h',
+                      'Nghỉ phép (' + monthKeyLabel + '): ' + formatOdooHours(leaveHours) + ' h',
                       'Σ Ngày Công: ' + worklogDays + ' d'
                     ];
                   }
@@ -1791,6 +1818,28 @@
       return ulnnOtState;
     }
 
+    function loadUlnnOtTouchedState() {
+      if (ulnnOtTouchedState && typeof ulnnOtTouchedState === 'object') return ulnnOtTouchedState;
+      try {
+        var raw = window.localStorage.getItem(ULNN_OT_TOUCHED_STORAGE_KEY);
+        var parsed = raw ? JSON.parse(raw) : {};
+        ulnnOtTouchedState = parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (error) {
+        ulnnOtTouchedState = {};
+      }
+      return ulnnOtTouchedState;
+    }
+
+    function saveUlnnOtTouchedState(nextState) {
+      ulnnOtTouchedState = nextState && typeof nextState === 'object' ? nextState : {};
+      try {
+        window.localStorage.setItem(ULNN_OT_TOUCHED_STORAGE_KEY, JSON.stringify(ulnnOtTouchedState));
+      } catch (error) {
+        // Ignore storage failures in private browsing or restricted contexts.
+      }
+      return ulnnOtTouchedState;
+    }
+
     function ensureUlnnOtEntry(userKey) {
       var state = loadUlnnOtState();
       if (!userKey) return { n: 0, 'n-1': 0, 'n-2': 0 };
@@ -1806,6 +1855,21 @@
       });
       saveUlnnOtState(state);
       return state[userKey];
+    }
+
+    function isUlnnOtTouched(userKey, monthKey) {
+      var state = loadUlnnOtTouchedState();
+      return !!((state[userKey] || {})[monthKey]);
+    }
+
+    function markUlnnOtTouched(userKey, monthKey) {
+      if (!userKey || !monthKey) return;
+      var state = loadUlnnOtTouchedState();
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: false, 'n-1': false, 'n-2': false };
+      }
+      state[userKey][monthKey] = true;
+      saveUlnnOtTouchedState(state);
     }
 
     function getUlnnOtValue(userKey, monthKey) {
@@ -1830,6 +1894,173 @@
       return getUlnnMonthKey(idx) + ' • ' + mr.label;
     }
 
+    function getUlnnMonthCalendarKey(monthKey) {
+      var monthRanges = (ulnnModalBaseState && ulnnModalBaseState.monthRanges) || [];
+      var index = ULNN_OT_MONTH_KEYS.indexOf(monthKey);
+      var mr = index > -1 ? monthRanges[index] : null;
+      if (!mr || !mr.startDate) return '';
+      return String(mr.startDate).slice(0, 7);
+    }
+
+    function getUlnnAttendanceRecordForMonthKey(monthKey) {
+      if (monthKey === 'n') return null;
+      var actualMonthKey = getUlnnMonthCalendarKey(monthKey);
+      if (!actualMonthKey) return null;
+      return ulnnAttendanceMonthMap[actualMonthKey] || null;
+    }
+
+    function getUlnnSelectedUserKey(user) {
+      if (!user) return '';
+      return getUlnnUserStorageKey(user);
+    }
+
+    function isCurrentOdooSelectedUser(user) {
+      if (!user) return false;
+      return isLoggedInOdooAccount(user.accountId)
+        || isLoggedInOdooAccount(user.username)
+        || isLoggedInOdooAccount(user.key)
+        || isLoggedInOdooAccount(user.email)
+        || isLoggedInOdooAccount(user.name)
+        || isLoggedInOdooAccount(user.id);
+    }
+
+    function getResolvedUlnnOtValue(user, monthKey) {
+      var userKey = getUlnnSelectedUserKey(user);
+      var storedValue = getUlnnOtValue(userKey, monthKey);
+      if (isUlnnOtTouched(userKey, monthKey)) {
+        return storedValue;
+      }
+
+      if (Number(storedValue) !== 0) {
+        markUlnnOtTouched(userKey, monthKey);
+        return storedValue;
+      }
+
+      var attendance = getUlnnAttendanceRecordForMonthKey(monthKey);
+      if (attendance && isCurrentOdooSelectedUser(user)) {
+        return normalizeUlnnOtValue(attendance.otHours || 0);
+      }
+
+      return storedValue;
+    }
+
+    function getResolvedUlnnLeaveHours(user, monthKey) {
+      if (!isCurrentOdooSelectedUser(user)) {
+        return 0;
+      }
+
+      var attendance = getUlnnAttendanceRecordForMonthKey(monthKey);
+      if (!attendance) {
+        return 0;
+      }
+
+      return normalizeUlnnOtValue(attendance.leaveHours || 0);
+    }
+
+    function uniqueValues(values) {
+      var seen = {};
+      return (values || []).filter(function(value) {
+        var key = String(value || '').trim();
+        if (!key || seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+    }
+
+    function collectUlnnAttendanceYears(monthRanges) {
+      return uniqueValues((monthRanges || []).slice(1).map(function(range) {
+        return range && range.startDate ? String(range.startDate).slice(0, 4) : '';
+      }));
+    }
+
+    async function fetchUlnnAttendanceYear(year) {
+      var key = String(year || '').trim();
+      if (!key) return [];
+      var token = getStoredOdooSessionToken();
+      if (!token) {
+        return [];
+      }
+
+      if (ulnnAttendanceTokenFingerprint !== token) {
+        ulnnAttendanceTokenFingerprint = token;
+        ulnnAttendanceCacheByYear = {};
+        ulnnAttendanceFetchPromisesByYear = {};
+        ulnnAttendanceMonthMap = {};
+      }
+
+      if (Object.prototype.hasOwnProperty.call(ulnnAttendanceCacheByYear, key)) {
+        return ulnnAttendanceCacheByYear[key];
+      }
+      if (ulnnAttendanceFetchPromisesByYear[key]) {
+        return ulnnAttendanceFetchPromisesByYear[key];
+      }
+
+      var promise = (async function() {
+        try {
+          var response = await fetch('/api/odoo/attendance?year=' + encodeURIComponent(key), {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': '*',
+              Authorization: 'Bearer ' + token
+            }
+          });
+          var data = await readJsonResponse(response);
+          if (!response.ok || !data || !data.ok) {
+            var attendanceError = new Error((data && data.message) || 'Attendance request failed');
+            attendanceError.statusCode = response.status;
+            throw attendanceError;
+          }
+          var records = Array.isArray(data.records)
+            ? data.records
+            : Array.isArray(data.data)
+              ? data.data
+              : [];
+          ulnnAttendanceCacheByYear[key] = records;
+          return records;
+        } catch (error) {
+          console.warn('[ULNN Attendance] fetch year failed', key, error);
+          if (error && (error.statusCode === 401 || error.statusCode === 403)) {
+            ulnnAttendanceTokenFingerprint = '';
+            ulnnAttendanceCacheByYear = {};
+            ulnnAttendanceFetchPromisesByYear = {};
+            ulnnAttendanceMonthMap = {};
+          }
+          return [];
+        } finally {
+          delete ulnnAttendanceFetchPromisesByYear[key];
+        }
+      })();
+
+      ulnnAttendanceFetchPromisesByYear[key] = promise;
+      return promise;
+    }
+
+    async function hydrateUlnnAttendanceDefaults(monthRanges) {
+      var years = collectUlnnAttendanceYears(monthRanges);
+      if (!years.length) {
+        ulnnAttendanceMonthMap = {};
+        return ulnnAttendanceMonthMap;
+      }
+
+      await Promise.all(years.map(function(year) {
+        return fetchUlnnAttendanceYear(year);
+      }));
+
+      var monthMap = {};
+      years.forEach(function(year) {
+        var records = ulnnAttendanceCacheByYear[year] || [];
+        records.forEach(function(record) {
+          if (record && record.monthKey) {
+            monthMap[record.monthKey] = record;
+          }
+        });
+      });
+
+      ulnnAttendanceMonthMap = monthMap;
+      return monthMap;
+    }
+
     function refreshUlnnOtSummary() {
       var totals = { n: 0, 'n-1': 0, 'n-2': 0 };
       if (!ulnnSelectedUsers || !ulnnSelectedUsers.length) {
@@ -1842,9 +2073,8 @@
       }
 
       ulnnSelectedUsers.forEach(function(user) {
-        var userKey = getUlnnUserStorageKey(user);
         ULNN_OT_MONTH_KEYS.forEach(function(monthKey) {
-          totals[monthKey] += getUlnnOtValue(userKey, monthKey);
+          totals[monthKey] += getResolvedUlnnOtValue(user, monthKey);
         });
       });
 
@@ -1880,7 +2110,7 @@
 
       var html = ulnnSelectedUsers.map(function(user, index) {
         var userKey = getUlnnUserStorageKey(user);
-        var entry = ensureUlnnOtEntry(userKey);
+        ensureUlnnOtEntry(userKey);
         var displayName = user.name || user.username || userKey || ('User ' + (index + 1));
         var subLabel = user.username || user.accountId || user.key || userKey;
         return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">' +
@@ -1889,7 +2119,7 @@
             '<div class="text-xs text-slate-400 mt-0.5">' + escapeHtml(subLabel) + '</div>' +
           '</td>' +
           ULNN_OT_MONTH_KEYS.map(function(monthKey) {
-            var value = entry[monthKey];
+            var value = getResolvedUlnnOtValue(user, monthKey);
             return '<td class="px-3 py-3 align-top">' +
               '<input type="number" min="0" step="0.1" inputmode="decimal" ' +
                 'value="' + escapeHtml(value || value === 0 ? String(value) : '0') + '" ' +
@@ -1906,6 +2136,7 @@
 
     function updateUlnnOtValue(userKey, monthKey, rawValue) {
       setUlnnOtValue(userKey, monthKey, rawValue);
+      markUlnnOtTouched(userKey, monthKey);
       refreshUlnnOtSummary();
       if (ulnnModalBaseState) {
         renderUlnnChart(ulnnModalBaseState);
@@ -2125,6 +2356,10 @@
           var leaveDaysRaw = (((data.profile || {}).stats || {}).totalLeaveRequest);
           var leaveDaysNumber = Number(leaveDaysRaw);
           odooLeaveHours = Number.isFinite(leaveDaysNumber) ? leaveDaysNumber * 8 : null;
+          ulnnAttendanceTokenFingerprint = '';
+          ulnnAttendanceCacheByYear = {};
+          ulnnAttendanceFetchPromisesByYear = {};
+          ulnnAttendanceMonthMap = {};
           renderStatCards();
           return data.profile || null;
         } catch (error) {
@@ -2132,6 +2367,10 @@
           odooSessionProfile = null;
           odooOverTimeHours = null;
           odooLeaveHours = null;
+          ulnnAttendanceTokenFingerprint = '';
+          ulnnAttendanceCacheByYear = {};
+          ulnnAttendanceFetchPromisesByYear = {};
+          ulnnAttendanceMonthMap = {};
           renderStatCards();
           return null;
         }
@@ -2531,7 +2770,7 @@
         var overtimeHours = isLoggedInOdooAccount(k) ? Number(odooOverTimeHours || 0) : 0;
         var leaveHours = isLoggedInOdooAccount(k) ? Number(odooLeaveHours || 0) : 0;
         var numerator = Math.max(0, (ngayCongAssignee * 7) + overtimeHours - leaveHours);
-        return estHours > 0 ? +(numerator / estHours + overtimeHours).toFixed(3) : 0;
+        return estHours > 0 ? +(numerator / (estHours + overtimeHours)).toFixed(3) : 0;
       });
 
       if (dashboardUlnnChart) dashboardUlnnChart.destroy();

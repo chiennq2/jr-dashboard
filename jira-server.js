@@ -9,6 +9,7 @@ const path = require('path');
 const odooLoginHandler = require('./api/odoo/login');
 const odooVerifyOtpHandler = require('./api/odoo/verify-otp');
 const odooMeHandler = require('./api/odoo/me');
+const odooAttendanceHandler = require('./api/odoo/attendance');
 const odooLogoutHandler = require('./api/odoo/logout');
 
 const JIRA_BASE = process.env.JIRA_BASE || 'https://20.84.97.109:3033';
@@ -51,6 +52,11 @@ async function handleOdooApi(req, res, requestPath) {
 
   if (requestPath === '/api/odoo/me') {
     await odooMeHandler(req, res);
+    return true;
+  }
+
+  if (requestPath === '/api/odoo/attendance') {
+    await odooAttendanceHandler(req, res);
     return true;
   }
 
