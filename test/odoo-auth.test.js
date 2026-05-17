@@ -565,9 +565,23 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /\/api\/odoo\/me/);
   assert.match(html, /Authorization: 'Bearer ' \+ token/);
   assert.match(html, /hydrateOdooSession/);
+  assert.match(html, /resolveDefaultAssigneeQuery/);
+  assert.match(html, /profile\.login/);
+  assert.match(html, /profile\.email/);
+  assert.match(html, /totalLeaveRequest/);
+  assert.match(html, /odooLeaveHours/);
+  assert.match(html, /DEFAULT_ASSIGNEE_QUERY/);
   assert.match(html, /renderStatCards/);
-  assert.match(html, /isLoggedInOdooAccount\(k\) \? Number\(odooOverTimeHours \|\| 0\) : 0/);
+  assert.match(html, /var leaveHours = isLoggedInOdooAccount\(k\) \? Number\(odooLeaveHours \|\| 0\) : 0;/);
+  assert.match(html, /var numerator = Math\.max\(0, \(ngayCongAssignee \* 7\) \+ overtimeHours - leaveHours\);/);
   assert.match(html, /isLoggedInOdooAccount\(key\) && odooOverTimeHours !== null && odooOverTimeHours !== undefined/);
+  assert.match(html, /Nghỉ phép: ' \+ odooLeaveText/);
+  assert.ok(
+    html.indexOf('await hydrateOdooSession();') > -1 &&
+    html.indexOf('await applyDefaultAssignee();') > -1 &&
+    html.indexOf('await hydrateOdooSession();') < html.indexOf('await applyDefaultAssignee();'),
+    'hydrateOdooSession should run before applyDefaultAssignee'
+  );
 });
 
 test('config failures return a clear error shape', async () => {
