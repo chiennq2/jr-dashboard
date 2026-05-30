@@ -1,0 +1,9 @@
+services:
+  jira-dashboard:
+    build: .
+    container_name: jira-dashboard
+    restart: unless-stopped
+    ports:
+      - "3456:3456"
+    env_file:
+      - .env.local
