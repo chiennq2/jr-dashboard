@@ -362,7 +362,7 @@ async function callUpstreamLogin(config, credentials) {
   } catch (err) {
     throw createOdooError(
       'ODOO_LOGIN_FAILED',
-      'Odoo login request failed: ' + err.message + (err.cause ? ' (' + (err.cause.message || err.cause.code || 'unknown') + ')' : ''),
+      'Login request failed: TIME_OUT',
       502,
       { targetUrl: url, errorName: err.name, errorCode: err.cause ? (err.cause.code || 'none') : 'none' }
     );
