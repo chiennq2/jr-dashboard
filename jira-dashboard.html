@@ -62,33 +62,40 @@
               </div>
               <button onclick="loadUlnnData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium">Áp dụng</button>
             </div>
-            <div id="ulnnOtSection" class="hidden px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-white">
-              <div class="flex items-center justify-between gap-4 mb-3">
+            <div id="ulnnOtSection" class="hidden px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-rose-50">
+              <div class="flex items-center justify-between gap-3 mb-2">
                 <div>
-                  <h4 class="font-semibold text-slate-800 text-sm">OT theo tháng</h4>
-                  <p class="text-xs text-slate-500 mt-1">Nhập OT cho từng user ở 3 tháng gần nhất. Dữ liệu sẽ được lưu cục bộ trên trình duyệt và dùng lại khi mở modal sau.</p>
+                  <h4 class="font-semibold text-slate-800 text-sm">OT và nghỉ phép theo tháng</h4>
+                  <p class="text-xs text-slate-500 mt-0.5">Nhập nhanh cho 3 tháng gần nhất. Mỗi cột tháng chứa 2 ô giá trị nhỏ để tiết kiệm chiều cao.</p>
                 </div>
-                <div class="text-xs font-medium text-slate-400">Đơn vị: giờ</div>
+                <div class="text-xs font-medium text-slate-400 whitespace-nowrap">Đơn vị: giờ</div>
               </div>
               <div class="overflow-x-auto">
                 <table id="ulnnOtTable" class="min-w-full border border-slate-200 rounded-xl overflow-hidden bg-white">
                   <thead class="bg-slate-50">
                     <tr class="text-xs uppercase tracking-wider text-slate-500">
-                      <th class="px-3 py-3 text-left font-semibold">User</th>
-                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN">n</th>
-                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN1">n-1</th>
-                      <th class="px-3 py-3 text-left font-semibold" id="ulnnOtHeadN2">n-2</th>
+                      <th class="px-3 py-2 text-left font-semibold w-[220px]">User</th>
+                      <th class="px-3 py-2 text-left font-semibold" id="ulnnOtHeadN">
+                        <div class="flex flex-col leading-tight">
+                          <span>n</span>
+                          <span class="text-[10px] font-medium normal-case text-slate-400">OT / Nghỉ phép</span>
+                        </div>
+                      </th>
+                      <th class="px-3 py-2 text-left font-semibold" id="ulnnOtHeadN1">
+                        <div class="flex flex-col leading-tight">
+                          <span>n-1</span>
+                          <span class="text-[10px] font-medium normal-case text-slate-400">OT / Nghỉ phép</span>
+                        </div>
+                      </th>
+                      <th class="px-3 py-2 text-left font-semibold" id="ulnnOtHeadN2">
+                        <div class="flex flex-col leading-tight">
+                          <span>n-2</span>
+                          <span class="text-[10px] font-medium normal-case text-slate-400">OT / Nghỉ phép</span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody id="ulnnOtTableBody" class="divide-y divide-slate-100"></tbody>
-                  <tfoot class="bg-slate-50 border-t border-slate-200">
-                    <tr id="ulnnOtSummary" class="text-sm font-semibold text-slate-700">
-                      <td class="px-3 py-3">Tổng OT</td>
-                      <td class="px-3 py-3" id="ulnnOtTotalN">0</td>
-                      <td class="px-3 py-3" id="ulnnOtTotalN1">0</td>
-                      <td class="px-3 py-3" id="ulnnOtTotalN2">0</td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>
@@ -98,7 +105,7 @@
                 <div class="spinner mr-3"></div>
                 <div class="text-slate-600 font-medium">Đang tải dữ liệu...</div>
               </div>
-              <div id="ulnnCanvasWrap" style="height:420px">
+              <div id="ulnnCanvasWrap" style="height:520px">
                 <canvas id="ulnnChartModal"></canvas>
               </div>
             </div>
@@ -148,7 +155,7 @@
       </div>
       <div class="flex flex-col gap-1.5">
         <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</label>
-        <select id="statusFilter" onchange="loadData()" class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+          <select id="statusFilter" class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
           <option value="all">Tất cả</option>
           <option value="CLOSED">Đã đóng</option>
           <option value="RESOLVED">Đã giải quyết</option>
@@ -171,9 +178,21 @@
   </div>
 
   <main class="max-w-7xl mx-auto px-6 py-6">
-    <div id="loadingState" class="flex flex-col items-center justify-center py-20 gap-4">
+    <div id="loadingState" class="hidden flex flex-col items-center justify-center py-20 gap-4">
       <div class="spinner"></div>
       <p class="text-slate-500 text-sm font-medium">Đang tải dữ liệu từ Jira...</p>
+    </div>
+
+    <div id="emptyState" class="flex flex-col items-center justify-center py-20 gap-3">
+      <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-7 4h8M7 4h10l3 3v13a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+        </svg>
+      </div>
+      <div class="text-center">
+        <p class="text-slate-700 font-semibold">Chưa có dữ liệu</p>
+        <p class="text-slate-500 text-sm mt-1">Bấm <span class="font-semibold">Tải lại</span> để tải dữ liệu từ Jira.</p>
+      </div>
     </div>
 
     <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-xl p-6 text-center">
@@ -311,6 +330,8 @@
     // ULNN (12 months) state
     const ULNN_OT_STORAGE_KEY = 'jira_dashboard_ulnn_ot_v1';
     const ULNN_OT_TOUCHED_STORAGE_KEY = 'jira_dashboard_ulnn_ot_touched_v1';
+    const ULNN_LEAVE_STORAGE_KEY = 'jira_dashboard_ulnn_leave_v1';
+    const ULNN_LEAVE_TOUCHED_STORAGE_KEY = 'jira_dashboard_ulnn_leave_touched_v1';
     const ULNN_OT_MONTH_KEYS = ['n', 'n-1', 'n-2'];
     let ulnnSelectedUsers = [];
     let ulnnCachedUsers = null;
@@ -318,6 +339,8 @@
     let ulnnModalBaseState = null;
     let ulnnOtState = null;
     let ulnnOtTouchedState = null;
+    let ulnnLeaveState = null;
+    let ulnnLeaveTouchedState = null;
     let ulnnAttendanceCacheByYear = {};
     let ulnnAttendanceFetchPromisesByYear = {};
     let ulnnAttendanceMonthMap = {};
@@ -328,7 +351,6 @@
     let odooOverTimeHours = 0;
     let odooLeaveHours = 0;
     let odooHydrationPromise = null;
-    const DEFAULT_ASSIGNEE_QUERY = 'chiennq@etc.vn';
 
     document.addEventListener('DOMContentLoaded', function() {
       // Scripts load async, wait for them then init
@@ -340,8 +362,6 @@
         try { initUlnnUserAutocomplete(); } catch(e) { console.error('ulnn user init error', e); }
         try { await initProjectFilter(); } catch(e) { console.error('project init error', e); }
         try { await hydrateOdooSession(); } catch(e) { console.error('odoo session init error', e); }
-        try { await applyDefaultAssignee(); } catch(e) { console.error('default assignee init error', e); }
-        try { await loadData(); } catch(e) { console.error('loadData error', e); }
       }
       setTimeout(safeInit, 300);
     });
@@ -358,7 +378,6 @@
     function onProjectChange() {
       cachedUsers = null;
       cachedUserQuery = '';
-      loadData();
     }
 
     // ===== FLATPICKR DATE RANGE =====
@@ -376,7 +395,7 @@
         dateFormat: 'd/m/Y',
         maxDate: today,
         onChange: function(selectedDates) {
-          if (selectedDates.length === 2) loadData();
+          if (selectedDates.length === 2) currentDateRange = getSelectedDateRange();
         }
       });
     }
@@ -1270,14 +1289,15 @@
               if (!u) return 0;
               var monthObj = u.months[mIdx];
               var worklogDays = Object.keys(monthObj.worklogDays || {}).length;
-              var estH = (monthObj.estClosed || 0) / 3600;
+              var logHours = (monthObj.estClosed || 0) / 3600;
               var selectedUser = (baseState.selectedUsers || []).filter(function(user) {
                 return getUlnnUserStorageKey(user) === uid;
               })[0];
               var otHours = selectedUser ? getResolvedUlnnOtValue(selectedUser, monthKey) : getUlnnOtValue(uid, monthKey);
               var leaveHours = selectedUser ? getResolvedUlnnLeaveHours(selectedUser, monthKey) : 0;
-              var numerator = Math.max(0, (worklogDays * 7) + otHours - leaveHours);
-              return estH > 0 ? Number((numerator / (estH + otHours)).toFixed(3)) : 0;
+              var numerator = (worklogDays * 7) - leaveHours + otHours;
+              var denominator = logHours + otHours;
+              return denominator > 0 ? Number((numerator / denominator).toFixed(3)) : 0;
             }),
             backgroundColor: monthColors[mIdx].bg,
             borderColor: monthColors[mIdx].border,
@@ -1440,58 +1460,18 @@
 
       document.getElementById('assigneeInput').value = '';
       document.getElementById('assigneeDropdown').classList.add('hidden');
-      if (!skipLoad) debounceLoad();
     }
 
     function removeAssignee(index) {
       if (index < 0 || index >= selectedAssignees.length) return;
       selectedAssignees.splice(index, 1);
       renderAssigneeTags();
-      loadData();
     }
 
     function clearAssignee() {
       document.getElementById('assigneeInput').value = '';
       selectedAssignees = [];
       renderAssigneeTags();
-      loadData();
-    }
-
-    function resolveDefaultAssigneeQuery() {
-      var profile = odooSessionProfile || {};
-      var candidates = [
-        profile.login,
-        profile.email,
-        DEFAULT_ASSIGNEE_QUERY
-      ];
-
-      for (var i = 0; i < candidates.length; i++) {
-        var value = String(candidates[i] || '').trim();
-        if (value) return value;
-      }
-
-      return DEFAULT_ASSIGNEE_QUERY;
-    }
-
-    async function applyDefaultAssignee() {
-      if (selectedAssignees.length > 0) return;
-      var query = resolveDefaultAssigneeQuery();
-      await fetchUserList(query);
-      if (!cachedUsers || cachedUsers.length === 0) return;
-
-      var q = query.toLowerCase();
-      var exact = cachedUsers.find(function(u) {
-        return (u.email || '').toLowerCase() === q
-          || (u.username || '').toLowerCase() === q
-          || (u.name || '').toLowerCase() === q;
-      });
-      var fallback = cachedUsers.find(function(u) {
-        return (u.email || '').toLowerCase().includes(q)
-          || (u.username || '').toLowerCase().includes(q)
-          || (u.name || '').toLowerCase().includes(q);
-      });
-      var user = exact || fallback;
-      if (user) selectAssignee(user, true);
     }
 
     async function initProjectFilter() {
@@ -1840,6 +1820,50 @@
       return ulnnOtTouchedState;
     }
 
+    function loadUlnnLeaveState() {
+      if (ulnnLeaveState && typeof ulnnLeaveState === 'object') return ulnnLeaveState;
+      try {
+        var raw = window.localStorage.getItem(ULNN_LEAVE_STORAGE_KEY);
+        var parsed = raw ? JSON.parse(raw) : {};
+        ulnnLeaveState = parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (error) {
+        ulnnLeaveState = {};
+      }
+      return ulnnLeaveState;
+    }
+
+    function saveUlnnLeaveState(nextState) {
+      ulnnLeaveState = nextState && typeof nextState === 'object' ? nextState : {};
+      try {
+        window.localStorage.setItem(ULNN_LEAVE_STORAGE_KEY, JSON.stringify(ulnnLeaveState));
+      } catch (error) {
+        // Ignore storage failures in private browsing or restricted contexts.
+      }
+      return ulnnLeaveState;
+    }
+
+    function loadUlnnLeaveTouchedState() {
+      if (ulnnLeaveTouchedState && typeof ulnnLeaveTouchedState === 'object') return ulnnLeaveTouchedState;
+      try {
+        var raw = window.localStorage.getItem(ULNN_LEAVE_TOUCHED_STORAGE_KEY);
+        var parsed = raw ? JSON.parse(raw) : {};
+        ulnnLeaveTouchedState = parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (error) {
+        ulnnLeaveTouchedState = {};
+      }
+      return ulnnLeaveTouchedState;
+    }
+
+    function saveUlnnLeaveTouchedState(nextState) {
+      ulnnLeaveTouchedState = nextState && typeof nextState === 'object' ? nextState : {};
+      try {
+        window.localStorage.setItem(ULNN_LEAVE_TOUCHED_STORAGE_KEY, JSON.stringify(ulnnLeaveTouchedState));
+      } catch (error) {
+        // Ignore storage failures in private browsing or restricted contexts.
+      }
+      return ulnnLeaveTouchedState;
+    }
+
     function ensureUlnnOtEntry(userKey) {
       var state = loadUlnnOtState();
       if (!userKey) return { n: 0, 'n-1': 0, 'n-2': 0 };
@@ -1854,6 +1878,23 @@
         }
       });
       saveUlnnOtState(state);
+      return state[userKey];
+    }
+
+    function ensureUlnnLeaveEntry(userKey) {
+      var state = loadUlnnLeaveState();
+      if (!userKey) return { n: 0, 'n-1': 0, 'n-2': 0 };
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: 0, 'n-1': 0, 'n-2': 0 };
+      }
+      ULNN_OT_MONTH_KEYS.forEach(function(monthKey) {
+        if (!Object.prototype.hasOwnProperty.call(state[userKey], monthKey)) {
+          state[userKey][monthKey] = 0;
+        } else {
+          state[userKey][monthKey] = normalizeUlnnOtValue(state[userKey][monthKey]);
+        }
+      });
+      saveUlnnLeaveState(state);
       return state[userKey];
     }
 
@@ -1872,6 +1913,21 @@
       saveUlnnOtTouchedState(state);
     }
 
+    function isUlnnLeaveTouched(userKey, monthKey) {
+      var state = loadUlnnLeaveTouchedState();
+      return !!((state[userKey] || {})[monthKey]);
+    }
+
+    function markUlnnLeaveTouched(userKey, monthKey) {
+      if (!userKey || !monthKey) return;
+      var state = loadUlnnLeaveTouchedState();
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: false, 'n-1': false, 'n-2': false };
+      }
+      state[userKey][monthKey] = true;
+      saveUlnnLeaveTouchedState(state);
+    }
+
     function getUlnnOtValue(userKey, monthKey) {
       var state = loadUlnnOtState();
       var entry = state[userKey] || {};
@@ -1886,6 +1942,22 @@
       }
       state[userKey][monthKey] = normalizeUlnnOtValue(rawValue);
       saveUlnnOtState(state);
+    }
+
+    function getUlnnLeaveValue(userKey, monthKey) {
+      var state = loadUlnnLeaveState();
+      var entry = state[userKey] || {};
+      return normalizeUlnnOtValue(entry[monthKey]);
+    }
+
+    function setUlnnLeaveValue(userKey, monthKey, rawValue) {
+      if (!userKey || !monthKey) return;
+      var state = loadUlnnLeaveState();
+      if (!state[userKey] || typeof state[userKey] !== 'object') {
+        state[userKey] = { n: 0, 'n-1': 0, 'n-2': 0 };
+      }
+      state[userKey][monthKey] = normalizeUlnnOtValue(rawValue);
+      saveUlnnLeaveState(state);
     }
 
     function getUlnnOtMonthLabel(monthRanges, idx) {
@@ -1945,16 +2017,23 @@
     }
 
     function getResolvedUlnnLeaveHours(user, monthKey) {
-      if (!isCurrentOdooSelectedUser(user)) {
-        return 0;
+      var userKey = getUlnnSelectedUserKey(user);
+      var storedValue = getUlnnLeaveValue(userKey, monthKey);
+      if (isUlnnLeaveTouched(userKey, monthKey)) {
+        return storedValue;
+      }
+
+      if (Number(storedValue) !== 0) {
+        markUlnnLeaveTouched(userKey, monthKey);
+        return storedValue;
       }
 
       var attendance = getUlnnAttendanceRecordForMonthKey(monthKey);
-      if (!attendance) {
-        return 0;
+      if (attendance) {
+        return normalizeUlnnOtValue(attendance.leaveHours || 0);
       }
 
-      return normalizeUlnnOtValue(attendance.leaveHours || 0);
+      return storedValue;
     }
 
     function uniqueValues(values) {
@@ -2087,6 +2166,32 @@
       return totals;
     }
 
+    function refreshUlnnLeaveSummary() {
+      var totals = { n: 0, 'n-1': 0, 'n-2': 0 };
+      if (!ulnnSelectedUsers || !ulnnSelectedUsers.length) {
+        var blankIds = ['ulnnLeaveTotalN', 'ulnnLeaveTotalN1', 'ulnnLeaveTotalN2'];
+        blankIds.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = '0';
+        });
+        return totals;
+      }
+
+      ulnnSelectedUsers.forEach(function(user) {
+        ULNN_OT_MONTH_KEYS.forEach(function(monthKey) {
+          totals[monthKey] += getResolvedUlnnLeaveHours(user, monthKey);
+        });
+      });
+
+      var totalN = document.getElementById('ulnnLeaveTotalN');
+      var totalN1 = document.getElementById('ulnnLeaveTotalN1');
+      var totalN2 = document.getElementById('ulnnLeaveTotalN2');
+      if (totalN) totalN.textContent = formatOdooHours(totals.n) + 'h';
+      if (totalN1) totalN1.textContent = formatOdooHours(totals['n-1']) + 'h';
+      if (totalN2) totalN2.textContent = formatOdooHours(totals['n-2']) + 'h';
+      return totals;
+    }
+
     function renderUlnnOtSection() {
       var section = document.getElementById('ulnnOtSection');
       var headN = document.getElementById('ulnnOtHeadN');
@@ -2111,20 +2216,34 @@
       var html = ulnnSelectedUsers.map(function(user, index) {
         var userKey = getUlnnUserStorageKey(user);
         ensureUlnnOtEntry(userKey);
+        ensureUlnnLeaveEntry(userKey);
         var displayName = user.name || user.username || userKey || ('User ' + (index + 1));
         var subLabel = user.username || user.accountId || user.key || userKey;
         return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">' +
-          '<td class="px-3 py-3 align-top">' +
+          '<td class="px-3 py-2.5 align-top">' +
             '<div class="font-semibold text-slate-800 text-sm">' + escapeHtml(displayName) + '</div>' +
             '<div class="text-xs text-slate-400 mt-0.5">' + escapeHtml(subLabel) + '</div>' +
           '</td>' +
           ULNN_OT_MONTH_KEYS.map(function(monthKey) {
-            var value = getResolvedUlnnOtValue(user, monthKey);
-            return '<td class="px-3 py-3 align-top">' +
-              '<input type="number" min="0" step="0.1" inputmode="decimal" ' +
-                'value="' + escapeHtml(value || value === 0 ? String(value) : '0') + '" ' +
-                'oninput="updateUlnnOtValue(\'' + escapeJsString(userKey) + '\', \'' + monthKey + '\', this.value)" ' +
-                'class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500" />' +
+            var otValue = getResolvedUlnnOtValue(user, monthKey);
+            var leaveValue = getResolvedUlnnLeaveHours(user, monthKey);
+            return '<td class="px-2 py-2 align-top min-w-[155px]">' +
+              '<div class="grid grid-cols-2 gap-1.5">' +
+                '<label class="flex flex-col gap-1">' +
+                  '<span class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">OT</span>' +
+                  '<input type="number" min="0" step="0.1" inputmode="decimal" ' +
+                    'value="' + escapeHtml(otValue || otValue === 0 ? String(otValue) : '0') + '" ' +
+                    'oninput="updateUlnnOtValue(\'' + escapeJsString(userKey) + '\', \'' + monthKey + '\', this.value)" ' +
+                    'class="w-full rounded-md border border-amber-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500" />' +
+                '</label>' +
+                '<label class="flex flex-col gap-1">' +
+                  '<span class="text-[10px] font-semibold uppercase tracking-wide text-rose-700">Nghỉ phép</span>' +
+                  '<input type="number" min="0" step="0.1" inputmode="decimal" ' +
+                    'value="' + escapeHtml(leaveValue || leaveValue === 0 ? String(leaveValue) : '0') + '" ' +
+                    'oninput="updateUlnnLeaveValue(\'' + escapeJsString(userKey) + '\', \'' + monthKey + '\', this.value)" ' +
+                    'class="w-full rounded-md border border-rose-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500" />' +
+                '</label>' +
+              '</div>' +
             '</td>';
           }).join('') +
         '</tr>';
@@ -2134,10 +2253,23 @@
       refreshUlnnOtSummary();
     }
 
+    function renderUlnnLeaveSection() {
+      // Consolidated into renderUlnnOtSection().
+    }
+
     function updateUlnnOtValue(userKey, monthKey, rawValue) {
       setUlnnOtValue(userKey, monthKey, rawValue);
       markUlnnOtTouched(userKey, monthKey);
       refreshUlnnOtSummary();
+      if (ulnnModalBaseState) {
+        renderUlnnChart(ulnnModalBaseState);
+      }
+    }
+
+    function updateUlnnLeaveValue(userKey, monthKey, rawValue) {
+      setUlnnLeaveValue(userKey, monthKey, rawValue);
+      markUlnnLeaveTouched(userKey, monthKey);
+      refreshUlnnLeaveSummary();
       if (ulnnModalBaseState) {
         renderUlnnChart(ulnnModalBaseState);
       }
@@ -2591,10 +2723,12 @@
 
     async function loadData() {
       var loading = document.getElementById('loadingState');
+      var emptyState = document.getElementById('emptyState');
       var errorEl = document.getElementById('errorState');
       var content = document.getElementById('dashboardContent');
 
       loading.classList.remove('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
       errorEl.classList.add('hidden');
       content.classList.add('hidden');
 
@@ -2654,9 +2788,11 @@
 
     function renderDashboard() {
       var loading = document.getElementById('loadingState');
+      var emptyState = document.getElementById('emptyState');
       var content = document.getElementById('dashboardContent');
       var totalIssues = allIssues.length;
       loading.classList.add('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
       content.classList.remove('hidden');
 
       renderStatCards();
@@ -2765,12 +2901,13 @@
 
       var ulnnLabels = Object.keys(ulnnAssigneeMap);
       var ulnnData = ulnnLabels.map(function(k) {
-        var estHours = (ulnnAssigneeMap[k].est || 0) / 3600;
+        var logHours = (ulnnAssigneeMap[k].log || 0) / 3600;
         var ngayCongAssignee = Object.keys(ulnnAssigneeWeekdayLogMap[k] || {}).length;
         var overtimeHours = isLoggedInOdooAccount(k) ? Number(odooOverTimeHours || 0) : 0;
         var leaveHours = isLoggedInOdooAccount(k) ? Number(odooLeaveHours || 0) : 0;
-        var numerator = Math.max(0, (ngayCongAssignee * 7) + overtimeHours - leaveHours);
-        return estHours > 0 ? +(numerator / (estHours + overtimeHours)).toFixed(3) : 0;
+        var numerator = (ngayCongAssignee * 7) - leaveHours + overtimeHours;
+        var denominator = logHours + overtimeHours;
+        return denominator > 0 ? +(numerator / denominator).toFixed(3) : 0;
       });
 
       if (dashboardUlnnChart) dashboardUlnnChart.destroy();

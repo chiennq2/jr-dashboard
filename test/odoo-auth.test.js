@@ -705,21 +705,29 @@ test('Odoo auth page smoke checks the reduced form and API wiring', () => {
 
 test('ULNN modal smoke checks the OT-by-month table wiring', () => {
   const html = fs.readFileSync(path.join(process.cwd(), 'jira-dashboard.html'), 'utf8');
-  assert.match(html, /OT theo tháng/);
+  assert.match(html, /OT và nghỉ phép theo tháng/);
   assert.match(html, /id="ulnnOtSection"/);
   assert.match(html, /id="ulnnOtTable"/);
   assert.match(html, /id="ulnnOtTableBody"/);
-  assert.match(html, /id="ulnnOtSummary"/);
+  assert.match(html, /updateUlnnLeaveValue/);
+  assert.match(html, /updateUlnnOtValue/);
   assert.match(html, /ULNN_OT_STORAGE_KEY/);
+  assert.match(html, /ULNN_LEAVE_STORAGE_KEY/);
   assert.match(html, /renderUlnnOtSection/);
+  assert.match(html, /renderUlnnLeaveSection/);
   assert.match(html, /getUlnnOtValue/);
+  assert.match(html, /getUlnnLeaveValue/);
   assert.match(html, /ulnnModalBaseState/);
   assert.match(html, /worklogDays \* 7/);
   assert.match(html, /leaveHours/);
+  assert.doesNotMatch(html, /id="ulnnLeaveSection"/);
 });
 
 test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () => {
   const html = fs.readFileSync(path.join(process.cwd(), 'jira-dashboard.html'), 'utf8');
+  assert.match(html, /id="emptyState"/);
+  assert.match(html, /Chưa có dữ liệu/);
+  assert.match(html, /id="loadingState" class="hidden/);
   assert.match(html, /Giờ OT/);
   assert.match(html, /odoo_session_token/);
   assert.match(html, /consumeOdooSessionTokenFromHash/);
@@ -727,7 +735,6 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /\/api\/odoo\/attendance/);
   assert.match(html, /Authorization: 'Bearer ' \+ token/);
   assert.match(html, /hydrateOdooSession/);
-  assert.match(html, /resolveDefaultAssigneeQuery/);
   assert.match(html, /profile\.login/);
   assert.match(html, /profile\.email/);
   assert.match(html, /totalLeaveRequest/);
@@ -738,20 +745,17 @@ test('dashboard smoke checks the Odoo OT stat and profile hydration wiring', () 
   assert.match(html, /getResolvedUlnnLeaveHours/);
   assert.match(html, /Number\(storedValue\) !== 0/);
   assert.match(html, /markUlnnOtTouched/);
+  assert.match(html, /markUlnnLeaveTouched/);
   assert.match(html, /attendanceDefaultsPromise/);
-  assert.match(html, /var numerator = Math\.max\(0, \(worklogDays \* 7\) \+ otHours - leaveHours\);/);
+  assert.match(html, /var numerator = \(worklogDays \* 7\) - leaveHours \+ otHours;/);
+  assert.match(html, /var denominator = logHours \+ otHours;/);
   assert.match(html, /monthKeyLabel/);
   assert.match(html, /OT \('/);
   assert.match(html, /Nghỉ phép \('/);
-  assert.match(html, /DEFAULT_ASSIGNEE_QUERY/);
   assert.match(html, /renderStatCards/);
   assert.match(html, /isLoggedInOdooAccount\(key\) && odooOverTimeHours !== null && odooOverTimeHours !== undefined/);
-  assert.ok(
-    html.indexOf('await hydrateOdooSession();') > -1 &&
-    html.indexOf('await applyDefaultAssignee();') > -1 &&
-    html.indexOf('await hydrateOdooSession();') < html.indexOf('await applyDefaultAssignee();'),
-    'hydrateOdooSession should run before applyDefaultAssignee'
-  );
+  assert.ok(html.indexOf('await hydrateOdooSession();') > -1);
+  assert.doesNotMatch(html, /try \{ await loadData\(\); \} catch\(e\) \{ console\.error\('loadData error', e\); \}/);
 });
 
 test('config failures return a clear error shape', async () => {
