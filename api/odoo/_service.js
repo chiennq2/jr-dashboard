@@ -349,20 +349,26 @@ function getAuthHeaders(token) {
 
 async function callUpstreamLogin(config, credentials) {
   const encryptedBody = encryptAes256Cbc(JSON.stringify(credentials), config.authSecret);
-  const response = await fetch(buildOdooUrl(config, '/api/v1/login'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': '*'
-    },
-    body: encryptedBody
-  });
+  const url = buildOdooUrl(config, '/api/v1/login');
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': '*'
+      },
+      body: encryptedBody
+    });
+  } catch (err) {
+    throw createOdooError(
+      'ODOO_LOGIN_FAILED',
+      'Odoo login request failed: ' + err.message + (err.cause ? ' (' + (err.cause.message || err.cause.code || 'unknown') + ')' : ''),
+      502,
+      { targetUrl: url, errorName: err.name, errorCode: err.cause ? (err.cause.code || 'none') : 'none' }
+    );
+  }
 
   const rawText = await response.text();
-  // console.log('[ODOO] login upstream response', {
-  //   status: response.status,
-  //   ok: response.ok,
-  //   body: rawText
-  // });
   if (!response.ok) {
     throw createOdooError(
       'ODOO_LOGIN_FAILED',
