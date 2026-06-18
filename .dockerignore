@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+.env
+.env.local
+.env.production
+.env.example
+.git/
+.gitignore
+doc/
+test/
+SETUP_LOCAL.md
+start-jira-dashboard.command
+*.md
+.claude/

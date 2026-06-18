@@ -147,7 +147,7 @@
         <div class="relative">
           <div id="assigneeChips" class="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-slate-300 rounded-lg bg-white cursor-text" onclick="document.getElementById('assigneeInput').focus()">
             <div id="assigneeTags"></div>
-            <input id="assigneeInput" type="text" autocomplete="off" placeholder="Tìm tên hoặc email..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
+            <input id="assigneeInput" name="assigneeSearch" type="text" autocomplete="new-password" placeholder="Tìm tên hoặc email..." class="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400" />
             <button id="clearAssignee" type="button" onclick="clearAssignee()" class="hidden ml-auto text-xs font-semibold text-slate-500 hover:text-slate-700">Xóa</button>
           </div>
           <div id="assigneeDropdown" class="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 w-full max-h-56 overflow-y-auto hidden"></div>
@@ -350,7 +350,10 @@
     let odooSessionProfile = null;
     let odooOverTimeHours = 0;
     let odooLeaveHours = 0;
+    let odooRangeOverTimeHours = null;
+    let odooRangeLeaveHours = null;
     let odooHydrationPromise = null;
+    let odooInitialAutoLoadToken = '';
 
     document.addEventListener('DOMContentLoaded', function() {
       // Scripts load async, wait for them then init
@@ -1439,7 +1442,7 @@
       else clearBtn.classList.add('hidden');
     }
 
-    function selectAssignee(user, skipLoad) {
+    function selectAssignee(user, skipLoad, options) {
       if (!user || !user.id) return;
       var exists = selectedAssignees.some(function(a) { return a.id === user.id; });
       if (exists) {
@@ -1447,6 +1450,9 @@
         document.getElementById('assigneeDropdown').classList.add('hidden');
         return;
       }
+
+      var preserveInput = Boolean(options && options.preserveInput);
+      var currentInput = document.getElementById('assigneeInput').value;
 
       selectedAssignees.push({
         id: user.id,
@@ -1458,8 +1464,81 @@
       });
       renderAssigneeTags();
 
-      document.getElementById('assigneeInput').value = '';
+      document.getElementById('assigneeInput').value = preserveInput ? currentInput : '';
       document.getElementById('assigneeDropdown').classList.add('hidden');
+    }
+
+    function getOdooPrimaryLoginValue() {
+      var profile = odooSessionProfile || {};
+      return String(profile.email || profile.login || profile.username || profile.displayName || profile.name || '').trim();
+    }
+
+    async function autoFillOdooAccountFilterOnce(token) {
+      var loginValue = getOdooPrimaryLoginValue();
+      if (!token || !loginValue || odooInitialAutoLoadToken === token) {
+        return false;
+      }
+      if (selectedAssignees.length > 0) {
+        odooInitialAutoLoadToken = token;
+        return false;
+      }
+
+      var input = document.getElementById('assigneeInput');
+      if (!input) return false;
+
+      var matches = [];
+      try {
+        matches = await searchUsers(loginValue, true);
+      } catch (error) {
+        matches = [];
+      }
+
+      var selectedUser = matches.find(function(user) {
+        return isLoggedInOdooAccount(user.accountId)
+          || isLoggedInOdooAccount(user.username)
+          || isLoggedInOdooAccount(user.key)
+          || isLoggedInOdooAccount(user.email)
+          || isLoggedInOdooAccount(user.name)
+          || isLoggedInOdooAccount(user.id);
+      }) || matches[0] || null;
+
+      if (!selectedUser) {
+        selectedUser = {
+          id: loginValue,
+          jqlId: loginValue,
+          accountId: '',
+          username: loginValue,
+          key: '',
+          name: loginValue,
+          email: loginValue
+        };
+      }
+
+      selectAssignee(selectedUser, true, { preserveInput: false });
+
+      var scrubAttempts = 0;
+      var scrubAutoFilledInput = function() {
+        if (!input) return;
+        var current = String(input.value || '').trim().toLowerCase();
+        var loginLower = String(loginValue || '').trim().toLowerCase();
+        var emailLower = String((selectedUser && selectedUser.email) || '').trim().toLowerCase();
+        var nameLower = String((selectedUser && selectedUser.name) || '').trim().toLowerCase();
+        if (current && (current === loginLower || current === emailLower || current === nameLower)) {
+          input.value = '';
+        }
+        scrubAttempts += 1;
+        if (scrubAttempts < 20) {
+          window.setTimeout(scrubAutoFilledInput, 50);
+        }
+      };
+      scrubAutoFilledInput();
+
+      odooInitialAutoLoadToken = token;
+      await loadData();
+
+      scrubAttempts = 0;
+      scrubAutoFilledInput();
+      return true;
     }
 
     function removeAssignee(index) {
@@ -2054,6 +2133,8 @@
 
     async function fetchUlnnAttendanceYear(year) {
       var key = String(year || '').trim();
+      var yearMatch = key.match(/\d{4}/);
+      key = yearMatch ? yearMatch[0] : key.slice(0, 4);
       if (!key) return [];
       var token = getStoredOdooSessionToken();
       if (!token) {
@@ -2295,6 +2376,80 @@
       return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
     }
 
+    function getAttendanceYearsInDateRange(range) {
+      var seen = {};
+      var startYear = String((range || {}).startDate || '').slice(0, 4);
+      var endYear = String((range || {}).endDate || '').slice(0, 4);
+      var years = [];
+
+      if (/^\d{4}$/.test(startYear)) years.push(startYear);
+      if (/^\d{4}$/.test(endYear)) years.push(endYear);
+
+      return years.filter(function(year) {
+        if (!/^\d{4}$/.test(year) || seen[year]) return false;
+        seen[year] = true;
+        return true;
+      });
+    }
+
+    function getAttendanceMonthKeyBounds(range) {
+      var startKey = String((range || {}).startDate || '').slice(0, 7);
+      var endKey = String((range || {}).endDate || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(startKey) || !/^\d{4}-\d{2}$/.test(endKey)) {
+        return { startKey: '', endKey: '' };
+      }
+      return { startKey: startKey, endKey: endKey };
+    }
+
+    async function hydrateOdooAttendanceForRange(range) {
+      var bounds = getAttendanceMonthKeyBounds(range);
+      if (!bounds.startKey || !bounds.endKey) {
+        odooRangeOverTimeHours = null;
+        odooRangeLeaveHours = null;
+        return { otHours: null, leaveHours: null, startKey: '', endKey: '' };
+      }
+
+      var years = getAttendanceYearsInDateRange(range);
+      if (!years.length) {
+        odooRangeOverTimeHours = null;
+        odooRangeLeaveHours = null;
+        return { otHours: null, leaveHours: null, startKey: bounds.startKey, endKey: bounds.endKey };
+      }
+
+      await Promise.all(years.map(function(year) {
+        return fetchUlnnAttendanceYear(year);
+      }));
+
+      var monthMap = {};
+      years.forEach(function(year) {
+        var records = ulnnAttendanceCacheByYear[year] || [];
+        records.forEach(function(record) {
+          if (record && record.monthKey) {
+            monthMap[record.monthKey] = record;
+          }
+        });
+      });
+
+      ulnnAttendanceMonthMap = monthMap;
+
+      var otHours = 0;
+      var leaveHours = 0;
+      Object.keys(monthMap).forEach(function(monthKey) {
+        if (monthKey < bounds.startKey || monthKey > bounds.endKey) return;
+        otHours += Number(monthMap[monthKey].otHours || 0);
+        leaveHours += Number(monthMap[monthKey].leaveHours || 0);
+      });
+
+      odooRangeOverTimeHours = Number(otHours.toFixed(3));
+      odooRangeLeaveHours = Number(leaveHours.toFixed(3));
+      return {
+        otHours: odooRangeOverTimeHours,
+        leaveHours: odooRangeLeaveHours,
+        startKey: bounds.startKey,
+        endKey: bounds.endKey
+      };
+    }
+
     function getOdooAccountAliases() {
       var profile = odooSessionProfile || {};
       var rawValues = [
@@ -2407,14 +2562,20 @@
       var ngayCong = workdaysInRange;
       var closedEstHours = toHours(closedEst);
       var ulnnGlobal = closedEstHours > 0 ? Math.round((ngayCong * 7 * 100) / closedEstHours) : 0;
-      var odooHoursLabel = odooOverTimeHours !== null && odooOverTimeHours !== undefined
-        ? formatOdooHours(odooOverTimeHours) + 'h'
+      var displayOverTimeHours = odooRangeOverTimeHours !== null && odooRangeOverTimeHours !== undefined
+        ? odooRangeOverTimeHours
+        : odooOverTimeHours;
+      var displayLeaveHours = odooRangeLeaveHours !== null && odooRangeLeaveHours !== undefined
+        ? odooRangeLeaveHours
+        : odooLeaveHours;
+      var odooHoursLabel = displayOverTimeHours !== null && displayOverTimeHours !== undefined
+        ? formatOdooHours(displayOverTimeHours) + 'h'
         : '-';
       var odooLoginLabel = odooSessionProfile && odooSessionProfile.login
         ? String(odooSessionProfile.login)
         : '';
-      var odooLeaveLabel = odooLeaveHours !== null && odooLeaveHours !== undefined
-        ? odooLeaveHours / 8 + 'd'
+      var odooLeaveLabel = displayLeaveHours !== null && displayLeaveHours !== undefined
+        ? displayLeaveHours / 8 + 'd'
         : '-';
       var odooHoursSub = odooSessionProfile
         ? 'Từ eGen' + (odooLoginLabel ? ' · ' + odooLoginLabel : '') + ' · ' + odooHoursLabel + ' OT' + ' | ' + odooLeaveLabel + ' nghỉ phép'
@@ -2424,7 +2585,7 @@
         { label: 'Σ Issue', value: totalIssues, sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
         { label: 'Σ Giờ Estimate', value: toHours(totalEst) + 'h', sub: toHours(totalEst) + 'h est \xb7 ' + toHours(totalLog) + 'h log', color: 'violet', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
         { label: 'Σ Giờ Closed', value: toHours(closedEst) + 'h est', sub: toHours(closedEst) + 'h est \xb7 ' + toHours(closedLog) + 'h log', color: 'emerald', icon: 'M5 13l4 4L19 7' },
-        { label: 'Σ Giờ OT', value: odooHoursLabel, sub: odooHoursSub, color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0_9_9_0_0118_0z' }
+        { label: 'Σ Giờ OT', value: odooHoursLabel, sub: odooHoursSub, color: 'amber', icon: 'M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0a9 9 0 0 1 18 0z' }
       ];
     }
 
@@ -2492,6 +2653,11 @@
           ulnnAttendanceCacheByYear = {};
           ulnnAttendanceFetchPromisesByYear = {};
           ulnnAttendanceMonthMap = {};
+          try {
+            await autoFillOdooAccountFilterOnce(token);
+          } catch (error) {
+            console.warn('[ODOO] auto fill account filter failed', error);
+          }
           renderStatCards();
           return data.profile || null;
         } catch (error) {
@@ -2774,6 +2940,14 @@
 
         currentIssuePage = 1;
 
+        try {
+          await hydrateOdooAttendanceForRange(currentDateRange || range);
+        } catch (attendanceErr) {
+          console.warn('[ODOO] hydrate attendance range failed', attendanceErr);
+          odooRangeOverTimeHours = null;
+          odooRangeLeaveHours = null;
+        }
+
         renderDashboard();
         var rt = document.getElementById('refreshTime');
         rt.textContent = 'Cập nhập: ' + new Date().toLocaleTimeString('vi-VN');
@@ -2903,8 +3077,12 @@
       var ulnnData = ulnnLabels.map(function(k) {
         var logHours = (ulnnAssigneeMap[k].log || 0) / 3600;
         var ngayCongAssignee = Object.keys(ulnnAssigneeWeekdayLogMap[k] || {}).length;
-        var overtimeHours = isLoggedInOdooAccount(k) ? Number(odooOverTimeHours || 0) : 0;
-        var leaveHours = isLoggedInOdooAccount(k) ? Number(odooLeaveHours || 0) : 0;
+        var overtimeHours = isLoggedInOdooAccount(k)
+          ? Number((odooRangeOverTimeHours !== null && odooRangeOverTimeHours !== undefined ? odooRangeOverTimeHours : odooOverTimeHours) || 0)
+          : 0;
+        var leaveHours = isLoggedInOdooAccount(k)
+          ? Number((odooRangeLeaveHours !== null && odooRangeLeaveHours !== undefined ? odooRangeLeaveHours : odooLeaveHours) || 0)
+          : 0;
         var numerator = (ngayCongAssignee * 7) - leaveHours + overtimeHours;
         var denominator = logHours + overtimeHours;
         return denominator > 0 ? +(numerator / denominator).toFixed(3) : 0;
@@ -2957,11 +3135,17 @@
                   var estH = toHours(_ulnnAssigneeMap[key].est || 0);
                   var logH = toHours(_ulnnAssigneeMap[key].log || 0);
                   var ngayCongAssignee = Object.keys(_ulnnAssigneeWeekdayLogMap[key] || {}).length;
-                  var odooHoursText = isLoggedInOdooAccount(key) && odooOverTimeHours !== null && odooOverTimeHours !== undefined
-                    ? formatOdooHours(odooOverTimeHours) + ' h'
+                  var tooltipOverTimeHours = odooRangeOverTimeHours !== null && odooRangeOverTimeHours !== undefined
+                    ? odooRangeOverTimeHours
+                    : odooOverTimeHours;
+                  var tooltipLeaveHours = odooRangeLeaveHours !== null && odooRangeLeaveHours !== undefined
+                    ? odooRangeLeaveHours
+                    : odooLeaveHours;
+                  var odooHoursText = isLoggedInOdooAccount(key) && tooltipOverTimeHours !== null && tooltipOverTimeHours !== undefined
+                    ? formatOdooHours(tooltipOverTimeHours) + ' h'
                     : '0 h';
-                  var odooLeaveText = isLoggedInOdooAccount(key) && odooLeaveHours !== null && odooLeaveHours !== undefined
-                    ? odooLeaveHours / 8 + ' d'
+                  var odooLeaveText = isLoggedInOdooAccount(key) && tooltipLeaveHours !== null && tooltipLeaveHours !== undefined
+                    ? tooltipLeaveHours / 8 + ' d'
                     : '0 d';
                   return [
                     'ULNN: ' + Number(ctx.parsed.y).toFixed(3),

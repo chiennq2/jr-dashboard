@@ -48,34 +48,60 @@ npm install
 
 ### Step 4: Chạy local server
 
+#### Cách A: Chạy trực tiếp (không cần Docker)
+
 ```bash
 # Cách 1: Chạy trực tiếp
 node jira-server.js
 
 # Cách 2: macOS - nhấp đúp file
 ./start-jira-dashboard.command
-
-# Cách 3: Chạy với dev script (nếu có)
-npm run dev
 ```
 
 **Output:**
 ```
-🚀 Jira Dashboard: http://localhost:3456
+🚀 Jira Dashboard listening on:
+   http://192.168.x.x:3456
    Press Ctrl+C to stop
 ```
 
+Server bind `0.0.0.0:3456` nên các máy khác trong cùng mạng LAN có thể truy cập qua:
+```
+http://<IP-máy-chủ>:3456
+```
+
+#### Cách B: Chạy bằng Docker Compose (khuyên dùng cho production)
+
+```bash
+# 1. Build image (chỉ cần lần đầu hoặc khi có thay đổi code)
+docker compose build
+
+# 2. Chạy container
+docker compose up -d
+
+# 3. Kiểm tra status
+docker compose ps
+
+# 4. Xem logs
+docker compose logs -f
+
+# Dừng container
+docker compose down
+```
+
+Docker Compose tự động mount `.env.local` vào container — không cần copy hay chỉnh sửa gì thêm.
+
 ### Step 5: Truy cập dashboard
 
-Mở browser: `http://localhost:3456`
+Mở browser: `http://localhost:3456` (local) hoặc `http://<IP-máy-chủ>:3456` (từ máy khác cùng mạng)
 
 ## ⚠️ Giữ Local & Prod Riêng Biệt
 
-| Khía cạnh | Local | Vercel |
+| Khía cạnh | Local / Docker | Vercel |
 |-----------|-------|--------|
-| **File chạy** | `jira-server.js` | `/api/*` routes |
+| **File chạy** | `jira-server.js` / `docker compose up` | `/api/*` routes |
 | **Auth** | KHÔNG có | Google OAuth |
-| **Port** | 3456 | Production domain |
+| **Port** | 3456 (bind `0.0.0.0`) | Production domain |
 | **Env vars** | `.env.local` | Vercel Dashboard |
 | **Commit?** | ❌ NO (.gitignore) | ❌ NO (Dashboard) |
 
