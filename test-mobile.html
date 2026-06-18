@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile CSS Test</title>
+  <style>
+    /* Test các nút mobile từ jira-dashboard.html */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f1f5f9;
+      padding: 1rem;
+    }
+
+    .test-section {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: #334155;
+    }
+
+    /* Mobile styles - matching jira-dashboard.html */
+    @media (max-width: 639px) {
+      /* Test uniform buttons */
+      .btn-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      button, a.btn {
+        width: 100% !important;
+        min-height: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.875rem !important;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        text-decoration: none;
+        box-sizing: border-box;
+      }
+
+      .btn-primary {
+        background: #0052CC;
+        color: white;
+      }
+
+      .btn-secondary {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-tertiary {
+        background: #f59e0b;
+        color: white;
+      }
+
+      /* Test inputs */
+      input, select {
+        width: 100% !important;
+        min-height: 48px !important;
+        height: 48px !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.875rem !important;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        box-sizing: border-box;
+      }
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 style="margin-bottom: 1rem; font-size: 1.25rem;">Mobile CSS Test - 375px viewport</h1>
+
+  <div class="test-section">
+    <h2>✓ Buttons - Should be uniform 48px height</h2>
+    <div class="btn-container">
+      <button class="btn-primary">Đăng xuất</button>
+      <button class="btn-secondary">Xuất báo cáo</button>
+      <button class="btn-tertiary">Xem biểu đồ</button>
+      <a href="#" class="btn btn-primary">Tải lại</a>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>✓ Inputs - Should be uniform 48px height</h2>
+    <div class="input-group">
+      <label>Date Range:</label>
+      <input type="text" placeholder="Select date range">
+    </div>
+    <div class="input-group">
+      <label>Assignee:</label>
+      <input type="text" placeholder="Search...">
+    </div>
+    <div class="input-group">
+      <label>Project:</label>
+      <select>
+        <option>All Projects</option>
+        <option>ETC</option>
+      </select>
+    </div>
+    <button class="btn-primary">Áp dụng</button>
+  </div>
+
+  <div class="test-section">
+    <h2>✓ Layout Check</h2>
+    <p style="font-size: 0.875rem; color: #64748b;">
+      - All buttons same height (48px)<br>
+      - All inputs same height (48px)<br>
+      - No horizontal overflow<br>
+      - Proper spacing (0.75rem gaps)
+    </p>
+  </div>
+
+  <script>
+    // Show viewport size
+    function updateViewport() {
+      const info = document.createElement('div');
+      info.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: #1e293b; color: white; padding: 0.5rem; text-align: center; font-size: 0.75rem; z-index: 9999;';
+      info.textContent = `Viewport: ${window.innerWidth}px × ${window.innerHeight}px`;
+      document.body.appendChild(info);
+    }
+    updateViewport();
+    window.addEventListener('resize', () => {
+      const old = document.querySelector('div[style*="position: fixed"]');
+      if (old) old.remove();
+      updateViewport();
+    });
+  </script>
+</body>
+</html>
