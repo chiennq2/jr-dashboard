@@ -963,6 +963,7 @@
                 <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Estimate</th>
                 <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Logged</th>
                 <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ngày tạo</th>
+                <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ngày logwork</th>
               </tr>
             </thead>
             <tbody id="issueTableBody" class="divide-y divide-slate-100"></tbody>
@@ -1566,7 +1567,8 @@
         var issueKeys = issues.map(function(x) { return x && x.key; }).filter(Boolean);
         var worklogResults = await Promise.all(issueKeys.map(async function(issueKey) {
           try {
-            return await fetchIssueWorklogs(issueKey);
+            var result = await fetchIssueWorklogs(issueKey);
+            return result.worklogs || [];
           } catch (e) {
             return [];
           }
@@ -1864,7 +1866,7 @@
                   var ik = monthIssues[idx] && monthIssues[idx].key;
                   if (!ik) { batchPromises.push(Promise.resolve([])); return; }
                   batchPromises.push(
-                    fetchIssueWorklogs(ik).catch(function() { return []; })
+                    fetchIssueWorklogs(ik).then(function(result) { return result.worklogs || []; }).catch(function() { return []; })
                   );
                 })(bj);
               }
@@ -2481,7 +2483,22 @@
         startAt += worklogs.length;
         if (!worklogs.length) break;
       }
-      return results;
+
+      // Find the latest worklog date
+      var lastLogDate = null;
+      if (results.length > 0) {
+        results.forEach(function(wl) {
+          if (wl.started) {
+            var wlDate = new Date(wl.started);
+            if (!lastLogDate || wlDate > lastLogDate) {
+              lastLogDate = wlDate;
+            }
+          }
+        });
+      }
+
+      console.log('fetchIssueWorklogs', issueKey, 'worklogs:', results.length, 'lastLogDate:', lastLogDate);
+      return { worklogs: results, lastLogDate: lastLogDate };
     }
 
     // Safer variant: fetch issues with a page cap and optional fields
@@ -2544,7 +2561,8 @@
         var issueAssignee = (((issue || {}).fields || {}).assignee) || {};
         var assigneeName = issueAssignee.displayName || issueAssignee.name || 'Unassigned';
         if (!out[assigneeName]) out[assigneeName] = {};
-        var logs = (worklogByIssueKey || {})[key] || [];
+        var worklogData = (worklogByIssueKey || {})[key] || {};
+        var logs = worklogData.worklogs || worklogData || [];
         logs.forEach(function(wl) {
           var logDate = parseIsoDateOnly(wl.started);
           if (!logDate || !isWeekday(logDate)) return;
@@ -3657,7 +3675,7 @@
           try {
             issueWorklogsByKey[issueKey] = await fetchIssueWorklogs(issueKey);
           } catch (e) {
-            issueWorklogsByKey[issueKey] = [];
+            issueWorklogsByKey[issueKey] = { worklogs: [], lastLogDate: null };
           }
         }
 
@@ -3896,6 +3914,7 @@
       // ---- Table ----
       var pagination = renderIssuePagination(totalIssues);
       var pagedIssues = allIssues.slice(pagination.start > 0 ? pagination.start - 1 : 0, pagination.end);
+      console.log('Rendering table, issueWorklogsByKey:', Object.keys(issueWorklogsByKey).length, 'entries');
       var tableRows = pagedIssues.map(function(i) {
         var tt = i.fields.timetracking || {};
         var normalized = normalizeStatus(i.fields.status);
@@ -3905,6 +3924,11 @@
           : normalized.key === 'IN_PROGRESS' ? 'status-IN_PROGRESS'
           : 'status-OPEN';
         var assignee = (i.fields.assignee || {}).displayName || (i.fields.assignee || {}).name || '-';
+        var worklogData = issueWorklogsByKey[i.key];
+        var lastLogDate = '-';
+        if (worklogData && worklogData.lastLogDate) {
+          lastLogDate = fmtDate(worklogData.lastLogDate);
+        }
         return '<tr class="hover:bg-slate-50 transition">' +
           '<td class="px-6 py-3"><a href="' + JIRA_BASE + '/browse/' + i.key + '" target="_blank" class="text-blue-600 hover:underline font-semibold text-xs">' + i.key + '</a></td>' +
           '<td class="px-6 py-3 max-w-xs truncate text-slate-700" title="' + (i.fields.summary || '') + '">' + (i.fields.summary || '-') + '</td>' +
@@ -3914,11 +3938,12 @@
           '<td class="px-4 py-3 text-center font-semibold text-slate-700">' + (tt.originalEstimateSeconds ? toHours(tt.originalEstimateSeconds) + 'h' : '-') + '</td>' +
           '<td class="px-4 py-3 text-center font-semibold ' + (tt.timeSpentSeconds ? 'text-emerald-600' : 'text-slate-400') + '">' + (tt.timeSpentSeconds ? toHours(tt.timeSpentSeconds) + 'h' : '-') + '</td>' +
           '<td class="px-4 py-3 text-center text-slate-500 text-xs">' + fmtDate(i.fields.created) + '</td>' +
+          '<td class="px-4 py-3 text-center text-slate-500 text-xs">' + lastLogDate + '</td>' +
         '</tr>';
       }).join('');
 
       document.getElementById('issueCount').textContent = totalIssues + ' issues';
-      document.getElementById('issueTableBody').innerHTML = tableRows || '<tr><td colspan="8" class="text-center py-8 text-slate-400">Khong co issue nao</td></tr>';
+      document.getElementById('issueTableBody').innerHTML = tableRows || '<tr><td colspan="9" class="text-center py-8 text-slate-400">Khong co issue nao</td></tr>';
       showToast('Đã tải ' + allIssues.length + ' issues', false);
 
       // Auto-collapse filter bar on mobile after loading data
